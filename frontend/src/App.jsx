@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import FeatureImportance from "./components/FeatureImportance";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
@@ -141,6 +142,7 @@ function SpamDetector() {
           >
             Reset
           </button>
+          <FeatureImportance darkMode={darkMode} />
         </div>
       </div>
     </div>
