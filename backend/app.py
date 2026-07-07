@@ -7,6 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from backend.services.severity import calculate_spam_severity
 
 load_dotenv()
 
@@ -96,10 +97,12 @@ def predict():
         prediction = model.predict(text_vector)
         final_output = label_encoder.inverse_transform(prediction)[0]
 
+        severity = calculate_spam_severity(text)
+
         with open("api.log", "a") as f:
             f.write(f"{datetime.now()} - Prediction: '{text[:50]}...' -> {final_output}\n")
             
-        return jsonify({"input": text, "prediction": final_output})
+        return jsonify({"input": text, "prediction": final_output, "severity": severity})
 
     except Exception as e:
         with open("api.log", "a") as f:

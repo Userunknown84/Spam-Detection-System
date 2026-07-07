@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from backend.xai_service import XAIService
 from backend.config import FRONTEND_URL, BASE_URL, PORT
+from backend.services.severity import calculate_spam_severity
 
 # ── Configure Logging ──────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -98,10 +99,12 @@ def predict(body: PredictIn):
         # a higher value means the model is more certain of that class.
         scores = model.decision_function(vectorized_text)[0]
         confidence = round(float(np.max(scores)), 4)
+        severity = calculate_spam_severity(body.text, input_type=body.type)
 
         return {
             "prediction": label,       # e.g. "ham", "spam", "smishing"
             "confidence": confidence,  # e.g. 1.2345
+            "severity": severity,
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

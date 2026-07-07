@@ -14,6 +14,7 @@ function SpamDetector() {
   const [text, setText] = useState("");
   const [result, setResult] = useState("");
   const [confidence, setConfidence] = useState(null);
+  const [severity, setSeverity] = useState(null);
   const [loading, setLoading] = useState(false);
   const [type, setType] = useState("message");
   const [showSettings, setShowSettings] = useState(false);
@@ -41,6 +42,7 @@ function SpamDetector() {
       });
       setResult(res.data.prediction);
       setConfidence(res.data.confidence ?? null);
+      setSeverity(res.data.severity ?? null);
     } catch (error) {
       setResult("Error");
     } finally {
@@ -287,6 +289,34 @@ function SpamDetector() {
                 </div>
               )}
 
+              {result && severity && result !== "Error" && (
+                <div className="mt-4 text-left rounded-2xl border border-slate-500/20 p-4 bg-slate-500/5">
+                  <p className="text-xs font-semibold mb-2 opacity-70">Severity</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`text-sm font-bold ${
+                      severity.color === "red"
+                        ? "text-red-600 dark:text-red-400"
+                        : severity.color === "orange"
+                        ? "text-orange-600 dark:text-orange-400"
+                        : severity.color === "yellow"
+                        ? "text-yellow-600 dark:text-yellow-400"
+                        : "text-green-600 dark:text-green-400"
+                    }`}>
+                      {severity.level}
+                    </span>
+                    <span className="text-sm font-semibold">{severity.score} / 10</span>
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    {severity.indicators.map((indicator) => (
+                      <div key={indicator} className="flex items-center gap-2">
+                        <span>✓</span>
+                        <span>{indicator}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {result && result !== "Error" && type !== "url" && (
                 <FeedbackWidget
                   key={`${text}|${result}|${confidence}`}
@@ -301,6 +331,7 @@ function SpamDetector() {
                   setText("");
                   setResult("");
                   setConfidence(null);
+                  setSeverity(null);
                   setType("message");
                 }}
                 className={`mt-4 w-full py-3.5 rounded-xl font-bold shadow-sm transition-all ${
