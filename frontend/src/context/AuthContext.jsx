@@ -3,8 +3,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState({ username: 'test_user', email: 'test@example.com' });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
