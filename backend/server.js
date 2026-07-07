@@ -103,6 +103,32 @@ app.post("/feedback", protect, async (req, res) => {
   }
 });
 
+app.get("/feedback/summary", protect, async (req, res) => {
+  try {
+    const response = await axios.get(`${ML_API_BASE}/feedback/summary`);
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    console.error(error.message);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
+app.get("/feedback/history", protect, async (req, res) => {
+  try {
+    const response = await axios.get(`${ML_API_BASE}/feedback/history`);
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    console.error(error.message);
+    res.status(500).json({ error: "Something went wrong" });
+  }
+});
+
 // Protected: analyze email headers for authenticity (forwarded to ML API)
 app.post("/analyze-email-header", protect, async (req, res) => {
   try {

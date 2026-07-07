@@ -6,6 +6,7 @@ import "../App.css";
 import FeatureImportance from "../components/FeatureImportance";
 import WordCloud from '../components/WordCloud';
 import FeedbackWidget from "../components/FeedbackWidget";
+import FeedbackAnalytics from "../components/FeedbackAnalytics";
 import Login from "./Login.jsx";
 import Register from "./Register.jsx";
 import EmailHeaderAnalyzer from "../components/EmailHeaderAnalyzer";
@@ -214,9 +215,19 @@ function SpamDetector() {
             >
               Sender Verifier
             </button>
+            <button
+              onClick={() => setActiveTab("analytics")}
+              className={`pb-1 px-4 transition-all border-b-2 ${
+                activeTab === "analytics"
+                  ? "border-current opacity-100"
+                  : "border-transparent opacity-50 hover:opacity-75"
+              }`}
+            >
+              Feedback Analytics
+            </button>
           </div>
 
-          {activeTab === "detector" ? (
+          {activeTab === "detector" && (
             <>
               <div className="mb-4">
                 <select
@@ -343,9 +354,9 @@ function SpamDetector() {
 
               <FeatureImportance darkMode={isDark} />
             </>
-          ) : (
-            <EmailHeaderAnalyzer />
           )}
+          {activeTab === "authenticity" && <EmailHeaderAnalyzer />}
+          {activeTab === "analytics" && <FeedbackAnalytics darkMode={isDark} />}
         </div>
       </div>
     </div>

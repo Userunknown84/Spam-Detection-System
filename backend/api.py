@@ -64,7 +64,7 @@ def heuristic_url_is_malicious(url):
 
 
 FEEDBACK_FILE = "feedback_store.csv"
-FEEDBACK_LABELS = set(label_encoder.classes_)
+FEEDBACK_LABELS = set(label_encoder.classes_) | {"offensive"}
 
 
 @app.route("/")
@@ -134,14 +134,116 @@ def feedback():
         return jsonify({"error": "Invalid feedback data"}), 400
 
     file_exists = os.path.isfile(FEEDBACK_FILE)
+    is_correct = (predicted_label == correct_label)
+    corrected_label_val = "" if is_correct else correct_label
+
     with open(FEEDBACK_FILE, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["text", "predicted_label", "correct_label", "submitted_at"])
+            writer.writerow(["text", "predicted_label", "correct_label", "submitted_at", "is_correct", "corrected_label"])
         from datetime import datetime, timezone
-        writer.writerow([text, predicted_label, correct_label, datetime.now(timezone.utc).isoformat()])
+        writer.writerow([
+            text,
+            predicted_label,
+            correct_label,
+            datetime.now(timezone.utc).isoformat(),
+            str(is_correct),
+            corrected_label_val
+        ])
 
     return jsonify({"message": "Feedback recorded. Thank you!"}), 201
+
+
+def calculate_feedback_stats(rows):
+    total = len(rows)
+    if total == 0:
+        return {
+            "total_feedback": 0,
+            "correct_predictions": 0,
+            "incorrect_predictions": 0,
+            "false_positives": 0,
+            "false_negatives": 0,
+            "accuracy_percentage": 0.0
+        }
+
+    correct = 0
+    incorrect = 0
+    fp = 0
+    fn = 0
+
+    for row in rows:
+        pred = str(row.get("predicted_label", "")).strip().lower()
+        corr = str(row.get("correct_label", "")).strip().lower()
+
+        is_correct_val = row.get("is_correct")
+        if is_correct_val is not None and is_correct_val != "":
+            is_correct = is_correct_val.strip().lower() == "true"
+        else:
+            is_correct = (pred == corr)
+
+        if is_correct:
+            correct += 1
+        else:
+            incorrect += 1
+            pred_is_neg = pred in ("ham", "safe")
+            corr_is_neg = corr in ("ham", "safe")
+            if not pred_is_neg and corr_is_neg:
+                fp += 1
+            elif pred_is_neg and not corr_is_neg:
+                fn += 1
+
+    accuracy = (correct / total) * 100.0
+    return {
+        "total_feedback": total,
+        "correct_predictions": correct,
+        "incorrect_predictions": incorrect,
+        "false_positives": fp,
+        "false_negatives": fn,
+        "accuracy_percentage": round(accuracy, 2)
+    }
+
+
+@app.route("/feedback/summary", methods=["GET"])
+def feedback_summary():
+    try:
+        if not os.path.exists(FEEDBACK_FILE):
+            return jsonify({
+                "total_feedback": 0,
+                "correct_predictions": 0,
+                "incorrect_predictions": 0,
+                "false_positives": 0,
+                "false_negatives": 0,
+                "accuracy_percentage": 0.0
+            })
+
+        with open(FEEDBACK_FILE, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        stats = calculate_feedback_stats(rows)
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/feedback/history", methods=["GET"])
+def feedback_history():
+    try:
+        if not os.path.exists(FEEDBACK_FILE):
+            return jsonify([])
+
+        with open(FEEDBACK_FILE, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        for row in rows:
+            if "is_correct" in row and row["is_correct"] != "":
+                row["is_correct"] = row["is_correct"].strip().lower() == "true"
+            else:
+                row["is_correct"] = row.get("predicted_label") == row.get("correct_label")
+        return jsonify(rows)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/analyze-email-header", methods=["POST"])

@@ -44,8 +44,10 @@ class TestFeedback:
         with open(feedback_file, newline="", encoding="utf-8") as f:
             rows = list(csv.reader(f))
 
-        assert rows[0] == ["text", "predicted_label", "correct_label", "submitted_at"]
+        assert rows[0] == ["text", "predicted_label", "correct_label", "submitted_at", "is_correct", "corrected_label"]
         assert rows[1][:3] == ["Win a free prize now!", "ham", "spam"]
+        assert rows[1][4] == "False"
+        assert rows[1][5] == "spam"
 
     def test_confirming_correct_prediction(self, client):
         c, feedback_file = client
@@ -61,6 +63,8 @@ class TestFeedback:
 
         assert rows[1][1] == "ham"
         assert rows[1][2] == "ham"
+        assert rows[1][4] == "True"
+        assert rows[1][5] == ""
 
     def test_appends_multiple_rows_without_duplicate_headers(self, client):
         c, feedback_file = client
@@ -76,14 +80,14 @@ class TestFeedback:
             rows = list(csv.reader(f))
 
         assert len(rows) == 4  # header + 3 feedback rows
-        assert rows[0] == ["text", "predicted_label", "correct_label", "submitted_at"]
+        assert rows[0] == ["text", "predicted_label", "correct_label", "submitted_at", "is_correct", "corrected_label"]
 
     def test_invalid_label_rejected(self, client):
         c, feedback_file = client
         res = c.post("/feedback", json={
             "text": "some text",
             "predicted_label": "ham",
-            "correct_label": "offensive",
+            "correct_label": "invalid_label",
         })
         assert res.status_code == 400
         assert res.get_json() == {"error": "Invalid feedback data"}
@@ -108,3 +112,54 @@ class TestFeedback:
         assert res.status_code == 400
         assert res.get_json() == {"error": "Invalid feedback data"}
         assert not feedback_file.exists()
+
+    def test_feedback_summary_empty(self, client):
+        c, feedback_file = client
+        res = c.get("/feedback/summary")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["total_feedback"] == 0
+        assert data["correct_predictions"] == 0
+        assert data["incorrect_predictions"] == 0
+        assert data["false_positives"] == 0
+        assert data["false_negatives"] == 0
+        assert data["accuracy_percentage"] == 0.0
+
+    def test_feedback_summary_calculations(self, client):
+        c, feedback_file = client
+        feedbacks = [
+            {"text": "t1", "predicted_label": "ham", "correct_label": "ham"},
+            {"text": "t2", "predicted_label": "spam", "correct_label": "spam"},
+            {"text": "t3", "predicted_label": "spam", "correct_label": "ham"},
+            {"text": "t4", "predicted_label": "ham", "correct_label": "spam"},
+            {"text": "t5", "predicted_label": "ham", "correct_label": "smishing"},
+            {"text": "t6", "predicted_label": "smishing", "correct_label": "smishing"},
+            {"text": "t7", "predicted_label": "ham", "correct_label": "offensive"},
+        ]
+        for fb in feedbacks:
+            res = c.post("/feedback", json=fb)
+            assert res.status_code == 201
+
+        res = c.get("/feedback/summary")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["total_feedback"] == 7
+        assert data["correct_predictions"] == 3
+        assert data["incorrect_predictions"] == 4
+        assert data["false_positives"] == 1
+        assert data["false_negatives"] == 3
+        assert data["accuracy_percentage"] == round(3 / 7 * 100, 2)
+
+    def test_feedback_history(self, client):
+        c, feedback_file = client
+        c.post("/feedback", json={"text": "t1", "predicted_label": "ham", "correct_label": "ham"})
+        c.post("/feedback", json={"text": "t2", "predicted_label": "spam", "correct_label": "spam"})
+
+        res = c.get("/feedback/history")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert len(data) == 2
+        assert data[0]["text"] == "t1"
+        assert data[1]["text"] == "t2"
+        assert data[0]["is_correct"] is True
+        assert data[1]["is_correct"] is True

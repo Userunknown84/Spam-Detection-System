@@ -1,12 +1,13 @@
 import { useState } from "react";
 import api from "../utils/axiosInstance";
 
-const LABELS = ["ham", "spam", "smishing"];
+const LABELS = ["ham", "spam", "smishing", "offensive"];
 
 const LABEL_DISPLAY = {
-  ham: "Safe (Ham)",
+  ham: "Ham",
   spam: "Spam",
   smishing: "Smishing",
+  offensive: "Offensive",
 };
 
 export default function FeedbackWidget({ text, predictedLabel, darkMode }) {
@@ -48,13 +49,13 @@ export default function FeedbackWidget({ text, predictedLabel, darkMode }) {
           onClick={() => submitFeedback(predictedLabel)}
           className="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 text-white hover:bg-green-500 transition-all"
         >
-          👍 Yes
+          ✓ Correct
         </button>
         <button
           onClick={() => setShowCorrection(true)}
           className="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-500 transition-all"
         >
-          👎 No
+          ✗ Incorrect
         </button>
       </div>
 
