@@ -8,7 +8,7 @@ const ManipulationIndex = ({ text, result, darkMode }) => {
         let score=0;
 
         const patterns =[
-            { name: 'Urgency', keywords: ['urgent', 'immediate', 'act now', 'asap', 'hurry', 'limited time'], score: 15 },
+      { name: 'Urgency', keywords: ['urgent', 'immediate', 'act now', 'asap', 'hurry', 'limited time'], score: 15 },
       { name: 'Fear', keywords: ['account', 'locked', 'suspended', 'blocked', 'security', 'risk'], score: 15 },
       { name: 'Greed', keywords: ['free', 'win', 'prize', 'money', 'reward', 'winner', 'claim'], score: 15 },
       { name: 'Authority', keywords: ['bank', 'government', 'official', 'admin', 'security team'], score: 10 },
