@@ -2,7 +2,7 @@ module.exports = {
     port: 3001,
     logLevel: 'silent',
     corsOrigins: ['*'],
-    mongodbUri: 'mongodb://localhost:27017/spam-test',
+    mongodbUri: '',
     rateLimit: {
         windowMs: 60000,
         max: 1000

@@ -1,9 +1,8 @@
 const express = require('express');
+const { exportReport } = require('../controllers/reportController');
 const router = express.Router();
 
-const { exportPdfReport } = require('../controllers/reportController');
-const { protect } = require('../middleware/authMiddleware');
-
-router.get('/export-pdf', protect, exportPdfReport);
+// Simple route - no missing handler
+router.get('/export-pdf',exportReport);
 
 module.exports = router;

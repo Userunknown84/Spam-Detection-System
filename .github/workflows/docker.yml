@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build ML API image
-        run: docker build -t spam-ml-api:ci -f backend/Dockerfile.api .
+        run: docker build -t spam-ml-api:ci -f backend/Dockerfile.api backend
 
       - name: Build Node backend image
         run: docker build -t spam-node-backend:ci -f backend/Dockerfile.node backend

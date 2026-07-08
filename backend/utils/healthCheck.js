@@ -1,33 +1,23 @@
-const mongoose = require('mongoose');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-
-// Read app version from package.json
-let appVersion = 'unknown';
-try {
-    const packageJsonPath = path.join(__dirname, '..', 'package.json');
-    const packageData = fs.readFileSync(packageJsonPath, 'utf8');
-    appVersion = JSON.parse(packageData).version || 'unknown';
-} catch (error) {
-    // Gracefully handle missing package.json or parse error
-}
+const mongoose = require("mongoose");
+const axios = require("axios");
+const { appVersion } = require("../config/appMetadata");
 
 /**
  * Check MongoDB connection status
- */ 
+ */
 const checkMongoDB = () => {
     const state = mongoose.connection.readyState;
     const states = {
-        0: 'disconnected',
-        1: 'connected',
-        2: 'connecting',
-        3: 'disconnecting'
+        0: "disconnected",
+        1: "connected",
+        2: "connecting",
+        3: "disconnecting",
     };
+
     return {
-        status: states[state] || 'unknown',
-        state: state,
-        ready: state === 1
+        status: states[state] || "unknown",
+        state,
+        ready: state === 1,
     };
 };
 
@@ -36,25 +26,28 @@ const checkMongoDB = () => {
  */
 const checkFlaskAPI = async () => {
     try {
-        let apiUrl = process.env.API || 'http://localhost:5000/predict';
+        let apiUrl = process.env.API || "http://localhost:5000/predict";
+
         // Ensure we hit the base URL for health check, stripping trailing slashes
         apiUrl = apiUrl.replace(/\/predict\/?$/, "").replace(/\/+$/, "");
-        
+
         const response = await axios.get(`${apiUrl}/health`, {
-            timeout: 2000
+            timeout: 2000,
         });
+
         return {
-            status: response.status === 200 ? 'healthy' : 'unhealthy',
+            status: response.status === 200 ? "healthy" : "unhealthy",
             ready: response.status === 200,
-            url: apiUrl
+            url: apiUrl,
         };
     } catch (error) {
-        let apiUrl = process.env.API || 'http://localhost:5000/predict';
+        let apiUrl = process.env.API || "http://localhost:5000/predict";
+
         return {
-            status: 'error',
+            status: "error",
             ready: false,
             url: apiUrl.replace(/\/predict\/?$/, "").replace(/\/+$/, ""),
-            error: error.message
+            error: error.message,
         };
     }
 };
@@ -69,14 +62,14 @@ const getHealthStatus = async () => {
     const allReady = mongodb.ready && flask.ready;
 
     return {
-        status: allReady ? 'healthy' : 'unhealthy',
+        status: allReady ? "healthy" : "unhealthy",
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         version: appVersion,
         dependencies: {
-            mongodb: mongodb,
-            flask: flask
-        }
+            mongodb,
+            flask,
+        },
     };
 };
 

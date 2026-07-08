@@ -37,6 +37,13 @@ const userSchema = new mongoose.Schema(
       enum: ['local', 'google'],
       default: 'local',
     },
+    // --- NEW FIELD FOR ISSUE #430 ---
+    webhookUrl: {
+      type: String,
+      trim: true,
+      default: null,
+      match: [/^https?:\/\/.+/, 'Please enter a valid HTTP or HTTPS URL'],
+    },
   },
   { timestamps: true }
 );

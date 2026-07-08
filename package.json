@@ -1,5 +1,10 @@
 {
   "dependencies": {
+    "express-rate-limit": "^8.5.2",
+    "firebase-admin": "^14.1.0",
     "react-icons": "^5.6.0"
+  },
+   "scripts": {
+    "test:file-validation": "node --test tests/fileValidation.test.js"
   }
 }

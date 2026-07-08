@@ -63,7 +63,7 @@ const Chatbot = () => {
     setIsLoading(true);
 
     try {
-      const apiUrl = `${import.meta.env.VITE_API_URI || 'http://localhost:8000'}/api/chat`;
+      const apiUrl = `${import.meta.env.VITE_API_URI || 'http://localhost:3000'}/api/chat`;
       const response = await axios.post(apiUrl, {
         message: messageText,
         history: newMessages.slice(0, -1) // Send context

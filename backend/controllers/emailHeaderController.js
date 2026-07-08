@@ -5,10 +5,10 @@ class EmailHeaderController {
         try {
             const { email_content } = req.body;
 
-            if (!email_content) {
+            if (!email_content || typeof email_content !== 'string') {
                 return res.status(400).json({
                     success: false,
-                    error: 'Email content is required'
+                    error: 'Email content is required and must be a string'
                 });
             }
 
@@ -20,10 +20,12 @@ class EmailHeaderController {
             });
 
         } catch (error) {
+            console.error('Email header analysis error:', error);
+
             return res.status(500).json({
                 success: false,
                 error: 'Failed to analyze email headers',
-                details: error.message
+                details: 'Internal server error'
             });
         }
     }

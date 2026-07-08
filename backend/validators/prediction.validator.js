@@ -101,6 +101,16 @@ class PredictionValidator {
         'number.min': 'Limit must be at least 1',
         'number.max': 'Limit cannot exceed 100'
       }),
+
+    // Added basic query string validation to prevent massive payloads
+    query: Joi.string()
+      .max(5000)
+      .optional()
+      .allow('')
+      .trim()
+      .messages({
+        'string.max': 'Query search string cannot exceed 5000 characters'
+      }),
     
     sort_by: Joi.string()
       .valid('date', 'confidence', 'message')

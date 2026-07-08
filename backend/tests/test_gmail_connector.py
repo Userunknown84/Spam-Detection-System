@@ -87,7 +87,16 @@ def test_fetch_gmail_emails(mock_get):
         }
     }
 
-    mock_get.side_effect = [mock_search_response, mock_detail_response_1, mock_detail_response_2]
+    def side_effect(url, *args, **kwargs):
+        if "users/me/messages?" in url:
+            return mock_search_response
+        elif "messages/msg_123" in url:
+            return mock_detail_response_1
+        elif "messages/msg_456" in url:
+            return mock_detail_response_2
+        return MagicMock(status_code=404)
+
+    mock_get.side_effect = side_effect
 
     emails = gmail_connector.fetch_gmail_emails("mock_access_token", limit=2)
     assert len(emails) == 2

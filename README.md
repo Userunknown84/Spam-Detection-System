@@ -99,8 +99,68 @@ pickle.dump(vectorizer, open("vectorizer.pkl", "wb"))
 ```
 
 ---
+## Url Model
+This project uses a **Logistic Regression** classifier to detect whether a URL is **Safe** or **Malicious**.
+
+### Model
+- **Algorithm:** Logistic Regression
+- **Library:** Scikit-learn
+- **Max Iterations:** 1000
+- **Class Weight:** Balanced
+- **Random State:** 42
+
+### Feature Extraction
+URLs are converted into numerical features using **TF-IDF (Term Frequency–Inverse Document Frequency)**.
+
+- **Vectorizer:** TF-IDF
+- **Analyzer:** Character-level
+- **N-gram Range:** 3–5
+- **Maximum Features:** 30,000
+
+Character-level n-grams help capture patterns commonly found in malicious URLs, such as suspicious keywords, unusual domain names, and obfuscated URL structures.
+
+### Dataset Labels
+
+| Original Label | Binary Label |
+|----------------|--------------|
+| benign         | Safe (0)     |
+| phishing       | Malicious (1)|
+| malware        | Malicious (1)|
+| defacement     | Malicious (1)|
+
+
+### Saved Files
+
+- `url_detector.pkl` – Trained Logistic Regression model.
+- `url_vectorizer.pkl` – TF-IDF vectorizer used during prediction.
+
+Accuracy: 0.9848841744013728
+---
 
 ## 🐍 Python API (Flask)
+
+### Running the Backend API
+
+This project contains two backend implementations. You can choose to run either Flask or FastAPI.
+
+**Option 1: Running Flask (api.py)**
+```bash
+cd backend
+python api.py
+```
+
+The Flask ML API binds to `127.0.0.1` (localhost only) with the debugger
+disabled by default. These are controlled via environment variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `FLASK_PORT` | `5000` | Port the API listens on. |
+| `FLASK_HOST` | `127.0.0.1` | Interface to bind. Use `0.0.0.0` to expose on all interfaces **only behind a trusted proxy**. |
+| `FLASK_DEBUG` | `false` | Enables the Werkzeug debugger. Keep off outside local development — it allows remote code execution. |
+
+> ⚠️ Never run with `FLASK_DEBUG=true` while bound to a non-loopback host. The
+> app refuses to start for that combination to prevent exposing the interactive
+> debugger over the network.
 
 ### 📦 Install Dependencies
 
@@ -140,6 +200,78 @@ if __name__ == "__main__":
 npm install express axios cors
 ```
 
+## 🧠 Explainable AI (XAI)
+
+The Spam Detection System now returns human-readable explanation details with every prediction. This includes example reasons, matched spam keywords, triggered spam indicators, and a risk score.
+
+### 🧾 Prediction API Response
+
+```json
+{
+  "input": "Claim your reward now!",
+  "result": "spam",
+  "prediction": "spam",
+  "confidence": 1.2345,
+  "domain_analysis": {
+    "domains_found": [],
+    "max_risk_score": 0,
+    "overall_risk": "SAFE",
+    "details": []
+  },
+  "explanation": {
+    "score": 94,
+    "reasons": [
+      "Suspicious URL detected",
+      "Promotional keywords found",
+      "Urgency language detected"
+    ],
+    "matched_keywords": [
+      "claim",
+      "reward",
+      "free"
+    ],
+    "spam_patterns": {
+      "urls": true,
+      "capitalization": false,
+      "punctuation": false,
+      "urgency": true,
+      "promotional": true,
+      "financial": false,
+      "banking": false,
+      "otp": false,
+      "crypto": false,
+      "lottery": false,
+      "threat": false,
+      "emoji": false,
+      "suspicious_domain": false,
+      "phone_number": false,
+      "shortened_url": false
+    },
+    "num_indicators": 3,
+    "top_indicators": [
+      "Suspicious URL detected",
+      "Promotional keywords found",
+      "Urgency language detected"
+    ],
+    "summary": "3 indicators triggered"
+  }
+}
+```
+
+### 💡 Example Request
+
+```bash
+curl -X POST http://localhost:5000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Urgent! Claim your prize now at https://bit.ly/offer","type":"message"}'
+```
+
+### 📌 Notes
+
+* The response is backward compatible with existing integrations.
+* `result` and `prediction` both return the same label.
+* `explanation` is optional in older API clients, but modern clients can use it to display detailed spam reasoning.
+
 ## Mongo Db Atlas Backend
 .env
 
@@ -173,6 +305,22 @@ app.post("/predict", async (req, res) => {
 
 app.listen(3000, () => console.log("Node server running"));
 ```
+
+## Rate Limiting
+
+Prediction endpoints are protected against abuse using
+`express-rate-limit`.
+
+Default configuration:
+
+```env
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=100
+```
+
+When the limit is exceeded the API returns:
+
+`HTTP 429 Too Many Requests`
 
 ---
 
@@ -348,6 +496,59 @@ python retrain.py
 ```
 
 This merges `feedback_store.csv` with the original training dataset (`DATASET_PATH`, default `dataset.csv`), retrains the TF-IDF vectorizer, LinearSVC model and label encoder, and overwrites `linear_svm_model.pkl`, `tfidf_vectorizer.pkl` and `label_encoder.pkl`.
+
+---
+## .env.example (Frontend)
+VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
+VITE_API_URI=http://localhost:3000
+VITE_PYTHON_URI=http://127.0.0.1:5000
+
+---
+
+## .env.example (Backend)
+DATABASE_PATH=spam_detection.db
+API_KEY=
+BASE_URL=http://localhost:8000
+PORT=8000
+FRONTEND_URL=http://localhost:5173
+FRONTEND_DEV_URL=http://localhost:3000
+FLASK_PORT=5000
+# Flask ML API debugger. Keep this OFF (false) outside local development — the
+# Werkzeug debugger allows remote code execution. Accepts 1/true/yes/on.
+FLASK_DEBUG=false
+# Interface the Flask ML API binds to. Defaults to localhost only. Set to
+# 0.0.0.0 to expose on all interfaces (only do this behind a trusted proxy and
+# never together with FLASK_DEBUG=true — the app will refuse to start).
+FLASK_HOST=127.0.0.1
+MODEL_PATH=linear_svm_model.pkl
+VECTORIZER_PATH=tfidf_vectorizer.pkl
+LABEL_ENCODER_PATH=label_encoder.pkl
+URL_MODEL_PATH=url_detector.pkl
+URL_VECTORIZER_PATH=url_vectorizer.pkl
+CLIENT_URL=http://localhost:3000
+PASSWORD_RESET_TOKEN_EXPIRES=15m
+EMAIL_FROM="Spam Detection System <noreply@example.com>"
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id_here
+
+# MongoDB (used for scan history / analytics dashboard)
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>/<db>?retryWrites=true&w=majority
+
+# Default Admin
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=admin123
+ADMIN_USERNAME=admin
+# IMAP scheduled scanning (issue #186) — used to encrypt stored inbox credentials at rest.
+# Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+IMAP_ENCRYPTION_KEY=G2upyOUQyViHzWnWDY5m_DuHFTRaxkdyDnoYtLkTwUk=
+# Where the sqlite store for IMAP connections/scan history lives (defaults to backend/imap_connections.db)
+IMAP_DB_PATH=
+
+# Shared secret authenticating Node→Flask requests. MANDATORY: the Flask ML API
+# refuses to start if this is missing or shorter than 32 characters, and there
+# is no default. Set the SAME value here as in the Node service's .env.
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+INTERNAL_SECRET=
 
 ---
 
@@ -724,6 +925,25 @@ are not covered by automated tests in this PR.
 - [Docker](https://docs.docker.com/get-docker/) installed
 - [Docker Compose](https://docs.docker.com/compose/install/) installed
 
+### 🔧 Environment Configuration
+
+Before running `docker-compose up`, create a `.env` file in the project root with the following required variables:
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `JWT_SECRET` | Secret key for JWT token generation | ✅ Yes | `your-super-secret-jwt-key-12345` |
+| `MONGODB_URI` | MongoDB connection string | ✅ Yes | `mongodb://localhost:27017/spam-detection` |
+| `GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID | ✅ Yes | `123456789-abcdefg.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 Client Secret | ✅ Yes | `GOCSPX-abcdefghijklmnop` |
+| `API_URL` | ML Prediction API URL | ✅ Yes | `http://localhost:5000/predict` |
+| `FRONTEND_URL` | Frontend URL | ✅ Yes | `http://localhost:5173` |
+| `VITE_API_URI` | Backend API URL (Frontend) | ✅ Yes | `http://localhost:3000/api` |
+
+
+# Frontend
+VITE_API_URI=http://localhost:3000/api
+VITE_ML_API_URI=http://localhost:5000/predict
+
 ### Docker Hub Images
 
 Pre-built images are available — no build step required:
@@ -790,10 +1010,8 @@ Feel free to fork, improve and contribute to this project!
 
 ## 📜 License
 
-This project is open-source and available under the MIT License.
+This project is open-source and available under the GPL-3.0 License.
 
 You are free to use, modify, and distribute this project for personal or commercial use, provided that proper credit is given.
 
-For more details, see the [LICENSE](LICENSE) file.
-
-
+For more details, see the [LICENSE](https://www.gnu.org/licenses/gpl-3.0) file.

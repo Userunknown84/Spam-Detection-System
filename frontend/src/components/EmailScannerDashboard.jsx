@@ -43,24 +43,26 @@ export default function EmailScannerDashboard() {
     refreshImapStatus();
   }, []);
 
-  const checkConnectionStatus = async () => {
-    // Check Gmail
-    try {
-      await api.get("/gmail/emails");
-      setGmailConnected(true);
-    } catch (err) {
-      setGmailConnected(false);
-    }
+const checkConnectionStatus = async () => {
+  try {
+    await pythonApi.get("/api/v1/gmail/scan");
+    setGmailConnected(true);
+  } catch {
+    setGmailConnected(false);
+  }
 
-    // Check Outlook
-    try {
-      await api.get("/outlook/emails");
-      setOutlookConnected(true);
-    } catch (err) {
-      setOutlookConnected(false);
-    }
-  };
+  try {
+    await pythonApi.get("/api/v1/outlook/scan");
+    setOutlookConnected(true);
+  } catch {
+    setOutlookConnected(false);
+  }
+};
 
+// Auth, user data — Node
+const fetchUser = async () => {
+  const res = await api.get("/user/profile");
+};
   const refreshImapStatus = async () => {
     try {
       const res = await api.get("/imap/status");

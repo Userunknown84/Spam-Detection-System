@@ -1,14 +1,27 @@
+import threading
 import mysql.connector
+from mysql.connector import pooling
 from backend.config import DB_HOST, DB_USER, DB_PASSWORD, DB_NAME
+
+db_pool = None
+pool_lock = threading.Lock()
 
 
 def get_connection():
-    return mysql.connector.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-    )
+    global db_pool
+    if db_pool is None:
+        with pool_lock:
+            if db_pool is None:
+                db_pool = mysql.connector.pooling.MySQLConnectionPool(
+                    pool_name="spam_detection_pool",
+                    pool_size=10,
+                    pool_reset_mode='session',
+                    host=DB_HOST,
+                    user=DB_USER,
+                    password=DB_PASSWORD,
+                    database=DB_NAME
+                )
+    return db_pool.get_connection()
 
 
 def init_db():

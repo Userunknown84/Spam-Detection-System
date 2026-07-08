@@ -1,28 +1,90 @@
-services:
+version: '3.8'
 
+# ============================================
+# SERVICES
+# ============================================
+
+services:
+  # ============================================
+  # REDIS - Rate Limiting & Caching
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: spam_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf --appendonly yes
+    networks:
+      - spam_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # ============================================
+  # ML API - Flask Prediction Service
+  # ============================================
   ml-api:
     image: rudra2006/spam-ml-api:latest
     build:
-      context: .
-      dockerfile: backend/Dockerfile.api
+      context: ./backend
+      dockerfile: Dockerfile.api
     container_name: spam_ml_api
     ports:
       - "5000:5000"
     environment:
       - FLASK_PORT=5000
+      - FLASK_HOST=0.0.0.0
+      - FLASK_DEBUG=false
       - MODEL_PATH=linear_svm_model.pkl
       - VECTORIZER_PATH=tfidf_vectorizer.pkl
       - LABEL_ENCODER_PATH=label_encoder.pkl
+      - URL_MODEL_PATH=url_detector.pkl
+      - URL_VECTORIZER_PATH=url_vectorizer.pkl
+      - INTERNAL_SECRET=${INTERNAL_SECRET}
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - spam_network
     restart: unless-stopped
+    volumes:
+      - ./backend/imap_connections.db:/app/imap_connections.db
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health')\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ============================================
+  # NODE BACKEND - API Gateway
+  # ============================================
   node-backend:
     image: rudra2006/spam-node-backend:latest
     build:
@@ -32,13 +94,60 @@ services:
     ports:
       - "3000:3000"
     environment:
+      - NODE_ENV=production
       - PORT=3000
-      - API=http://ml-api:5000/predict
+      - API_URL=http://ml-api:5000/predict
+      - ML_API_URL=http://ml-api:5000
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - INTERNAL_SECRET=${INTERNAL_SECRET}
+      - REDIS_URL=redis://redis:6379
+      
+      # Rate Limiting Configuration
+      - PREDICT_RATE_LIMIT_WINDOW_MS=60000
+      - PREDICT_RATE_LIMIT_MAX=30
+      - LOGIN_RATE_LIMIT_MAX=5
+      - REGISTER_RATE_LIMIT_MAX=5
+      - RESET_RATE_LIMIT_MAX=3
+      - API_RATE_LIMIT_MAX=100
+      - CHAT_RATE_LIMIT_MAX=15
+      - OTP_RATE_LIMIT_MAX=3
+      - VERIFICATION_RATE_LIMIT_MAX=5
+      - BULK_PREDICT_RATE_LIMIT_MAX=10
+      - EXPORT_RATE_LIMIT_MAX=5
+      - FEEDBACK_RATE_LIMIT_MAX=10
+      
+      # OAuth Configuration
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      
+      # Email Configuration
+      - EMAIL_FROM=${EMAIL_FROM:-noreply@spamdetection.com}
+      - PASSWORD_RESET_TOKEN_EXPIRES=${PASSWORD_RESET_TOKEN_EXPIRES:-15m}
+      
+      # Frontend URLs
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - FRONTEND_DEV_URL=${FRONTEND_DEV_URL:-http://localhost:5173}
+      
+      # Admin Configuration
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      
+      # IMAP Configuration
+      - IMAP_ENCRYPTION_KEY=${IMAP_ENCRYPTION_KEY}
+      - IMAP_DB_PATH=${IMAP_DB_PATH:-./imap_connections.db}
+      
+      # Logging
+      - LOG_LEVEL=info
     depends_on:
-      - ml-api
+      ml-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - spam_network
     restart: unless-stopped
@@ -47,24 +156,177 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+      - ./backend/imap_connections.db:/app/imap_connections.db
 
+  # ============================================
+  # FRONTEND - React Application
+  # ============================================
   frontend:
     image: rudra2006/spam-frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_URI=
+        - VITE_API_URI=${VITE_API_URI:-http://localhost:3000/api}
+        - VITE_PYTHON_URI=${VITE_PYTHON_URI:-http://localhost:5000}
+        - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     container_name: spam_frontend
     ports:
       - "80:80"
+      - "443:443"  # HTTPS support
     depends_on:
-      - node-backend
+      node-backend:
+        condition: service_healthy
     networks:
       - spam_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ============================================
+  # NGINX - Reverse Proxy (Optional)
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: spam_nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - node-backend
+      - ml-api
+    networks:
+      - spam_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+  # ============================================
+  # MONGODB - Database (Optional - Use Atlas or Local)
+  # ============================================
+  mongodb:
+    image: mongo:6-jammy
+    container_name: spam_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-password}
+      - MONGO_INITDB_DATABASE=spamdetection
+    volumes:
+      - mongodb-data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - spam_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================
+  # MONGODB EXPRESS - Database GUI (Optional)
+  # ============================================
+  mongo-express:
+    image: mongo-express:latest
+    container_name: spam_mongo_express
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_USERNAME:-admin}
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_PASSWORD:-password}
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+      - ME_CONFIG_BASICAUTH_USERNAME=${ME_USERNAME:-admin}
+      - ME_CONFIG_BASICAUTH_PASSWORD=${ME_PASSWORD:-admin123}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - spam_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+# ============================================
+# VOLUMES
+# ============================================
+volumes:
+  redis-data:
+    driver: local
+  mongodb-data:
+    driver: local
+  backend-uploads:
+    driver: local
+  backend-logs:
+    driver: local
+
+# ============================================
+# NETWORKS
+# ============================================
 networks:
   spam_network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

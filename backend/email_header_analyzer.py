@@ -210,14 +210,37 @@ def analyze_headers(headers_text):
         risk_score += 20
         findings.append("Sender domain mismatch detected")
         
+    # Real-time domain analysis (WHOIS and threat intelligence / blacklist)
+    if from_domain:
+        try:
+            import domain_checker
+            domain_analysis = domain_checker.analyze_domain(from_domain)
+            domain_age = domain_analysis.get("age_days")
+            domain_blacklisted = domain_analysis.get("blacklisted", False)
+            
+            if isinstance(domain_age, (int, float)) and domain_age < 30:
+                risk_score += 30
+                findings.append(f"Sender domain is recently registered (< 30 days old: {domain_age} days)")
+                reasons.append(f"Recently registered sender domain ({domain_age} days)")
+                
+            if domain_blacklisted:
+                risk_score = 100
+                findings.append("Sender domain is blacklisted on threat intelligence or DNSBL lists")
+                reasons.append("Sender domain is blacklisted")
+        except Exception:
+            pass
+            
     risk_score = min(risk_score, 100)
     
     if risk_score <= 20:
         trust_level = "Trusted"
+        risk_level = "Trusted"
     elif risk_score <= 60:
         trust_level = "Suspicious"
+        risk_level = "Suspicious"
     else:
         trust_level = "High Risk"
+        risk_level = "High Risk"
         
     return {
         "sender": from_email if from_email else "unknown",

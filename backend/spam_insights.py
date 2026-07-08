@@ -136,12 +136,187 @@ def load_data():
                 
     return messages
 
+import threading
+import time
+import hashlib
+import json
+from collections import OrderedDict
+
+# Configuration
+_MAX_CACHE_ENTRIES = int(os.getenv("SPAM_INSIGHTS_MAX_CACHE_ENTRIES", "5"))
+_CACHE_TTL_SECONDS = int(os.getenv("SPAM_INSIGHTS_CACHE_TTL_SECONDS", "60"))
+
+# Helper to compute a lightweight file hash based on size and mtime
+def _hash_file(path: str) -> str:
+    try:
+        stat = os.stat(path)
+        identifier = f"{stat.st_size}-{int(stat.st_mtime)}"
+        return hashlib.sha256(identifier.encode()).hexdigest()
+    except OSError:
+        return ""
+
+# In‑process cache holding multiple entries identified by a source hash
+_CACHE_LOCK = threading.Lock()
+_CACHE = {
+    "entries": OrderedDict()  # source_hash -> {"expires_at", "mtimes", "messages", "aggregates"}
+}
+
+def _get_source_paths():
+    base_dir = os.path.dirname(__file__)
+    feedback_path = os.path.join(base_dir, "output", "feedback_store.csv")
+    dataset_paths = [
+        os.path.join(base_dir, "dataset.csv"),
+        os.path.join(os.path.dirname(base_dir), "dataset.csv"),
+    ]
+    dataset_path = next((p for p in dataset_paths if os.path.isfile(p)), dataset_paths[0])
+    return feedback_path, dataset_path
+
+
+def _get_mtime_or_none(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
+def _tokenize_cached_messages(messages):
+    # Pre-tokenize to avoid re-tokenizing for each category/limit.
+    tokenized = []
+    for m in messages:
+        tokens = tokenize(m.get("text", ""))
+        # Apply stopword filtering once.
+        tokens_filtered = [w for w in tokens if w not in STOP_WORDS]
+        tokenized.append({"category": (m.get("category") or "").lower(), "text": m.get("text", ""), "words": tokens_filtered})
+    return tokenized
+
+
+def _compute_aggregates(messages):
+    """Compute full aggregates once, then serve per-request slices."""
+    tokenized = _tokenize_cached_messages(messages)
+
+    def filter_msgs(cat):
+        if cat:
+            cat_l = cat.lower()
+            return [m for m in tokenized if m["category"] == cat_l]
+        # Exclude ham/safe by default
+        return [m for m in tokenized if m["category"] not in ("ham", "safe")]
+
+    aggregates = {}
+
+    # Overall / default aggregations (category=None)
+    overall_msgs = filter_msgs(None)
+
+    # Category-specific indicator (always based on full messages list)
+    category_indicators = {}
+    for cat in ("spam", "smishing", "offensive"):
+        cat_msgs_raw = [m for m in tokenized if m["category"] == cat]
+        cat_counter = Counter()
+        for m in cat_msgs_raw:
+            cat_counter.update(m["words"])
+        cat_inds = [item[0] for item in cat_counter.most_common(5)]
+        if not cat_inds:
+            cat_inds = FALLBACK_CATEGORY_INDICATORS.get(cat, [])
+        category_indicators[cat] = cat_inds
+
+    # Keyword frequency + trending phrases + recent suspicious terms for each category request.
+    def compute_for_msgs(msgs):
+        # keywords
+        keywords_counter = Counter()
+        for m in msgs:
+            keywords_counter.update(m["words"])
+        top_keywords_all = [{"keyword": k, "count": c} for k, c in keywords_counter.most_common()]
+
+        # trending phrases (bigrams + trigrams)
+        phrases_counter = Counter()
+        for m in msgs:
+            words = m["words"]
+            # bigrams
+            for i in range(len(words) - 1):
+                phrases_counter[f"{words[i]} {words[i+1]}"] += 1
+            # trigrams
+            for i in range(len(words) - 2):
+                phrases_counter[f"{words[i]} {words[i+1]} {words[i+2]}"] += 1
+        trending_phrases_all = [{"phrase": p, "count": c} for p, c in phrases_counter.most_common()]
+
+        # recent terms: last 20 messages (based on original load order)
+        recent_msgs = msgs[-20:]
+        recent_counter = Counter()
+        for m in recent_msgs:
+            words = m["words"]
+            for w in words:
+                recent_counter[w] += 1
+            for i in range(len(words) - 1):
+                recent_counter[f"{words[i]} {words[i+1]}"] += 1
+        recent_terms_all = [item[0] for item in recent_counter.most_common()]
+        return top_keywords_all, trending_phrases_all, recent_terms_all
+
+    # Precompute for category=None and category=spam/smishing/offensive.
+    aggregates["default"] = {}
+    aggregates["default"]["top_keywords_all"], aggregates["default"]["trending_phrases_all"], aggregates["default"]["recent_terms_all"] = compute_for_msgs(overall_msgs)
+
+    for cat in ("spam", "smishing", "offensive"):
+        msgs = filter_msgs(cat)
+        top_keywords_all, trending_phrases_all, recent_terms_all = compute_for_msgs(msgs)
+        aggregates[cat] = {
+            "top_keywords_all": top_keywords_all,
+            "trending_phrases_all": trending_phrases_all,
+            "recent_terms_all": recent_terms_all,
+        }
+
+    aggregates["category_indicators"] = category_indicators
+    return aggregates
+
+def _get_cached_aggregates():
+    feedback_path, dataset_path = _get_source_paths()
+    feedback_mtime = _get_mtime_or_none(feedback_path)
+    dataset_mtime = _get_mtime_or_none(dataset_path)
+    source_hash = _hash_file(feedback_path) + "-" + _hash_file(dataset_path)
+    now = time.time()
+
+    # Quick check without lock
+    entry = _CACHE["entries"].get(source_hash)
+    if entry and entry.get("expires_at", 0) > now:
+        if entry.get("mtimes", {}).get("feedback") == feedback_mtime and entry.get("mtimes", {}).get("dataset") == dataset_mtime:
+            return entry.get("aggregates", {})
+
+    # Acquire lock to recompute if needed
+    with _CACHE_LOCK:
+        # Re-check under lock
+        entry = _CACHE["entries"].get(source_hash)
+        if entry and entry.get("expires_at", 0) > now:
+            if entry.get("mtimes", {}).get("feedback") == feedback_mtime and entry.get("mtimes", {}).get("dataset") == dataset_mtime:
+                return entry.get("aggregates", {})
+
+        messages = load_data()
+        aggregates = _compute_aggregates(messages) if len(messages) >= 5 else {}
+        new_entry = {
+            "expires_at": now + _CACHE_TTL_SECONDS,
+            "mtimes": {"feedback": feedback_mtime, "dataset": dataset_mtime},
+            "messages": messages,
+            "aggregates": aggregates,
+        }
+        # Insert/replace entry
+        _CACHE["entries"][source_hash] = new_entry
+        # Evict oldest if exceeding max entries
+        while len(_CACHE["entries"]) > _MAX_CACHE_ENTRIES:
+            _CACHE["entries"].popitem(last=False)
+        return aggregates
+
 def get_spam_insights(limit=10, category=None):
     """Analyzes message data and returns top keywords, phrases, recent terms, and indicators."""
-    messages = load_data()
-    
-    # If no data exists, output fallback indicators
+    # Ensure cache is populated and retrieve the appropriate entry
+    feedback_path, dataset_path = _get_source_paths()
+    source_hash = _hash_file(feedback_path) + "-" + _hash_file(dataset_path)
+    entry = _CACHE["entries"].get(source_hash)
+    if not entry:
+        aggregates = _get_cached_aggregates()
+        entry = _CACHE["entries"].get(source_hash)
+    else:
+        aggregates = entry.get("aggregates", {})
+    messages = entry.get("messages", []) if entry else []
+
     if len(messages) < 5:
+        # Fallback logic (unchanged)
         if category:
             cat_lower = category.lower()
             if cat_lower in FALLBACK_KEYWORDS:
@@ -175,74 +350,32 @@ def get_spam_insights(limit=10, category=None):
             "category_indicators": FALLBACK_CATEGORY_INDICATORS
         }
 
-    # If real data is loaded, run calculations
+    # If real data is loaded, serve from precomputed aggregates (no CSV reads / no tokenization here).
     if category:
-        filtered_msgs = [m for m in messages if m["category"] == category.lower()]
+        cat_key = category.lower()
     else:
-        # Exclude ham and safe messages to focus on spam patterns
-        filtered_msgs = [m for m in messages if m["category"] not in ("ham", "safe")]
-        
-    # 1. Keywords Frequency
-    keywords_counter = Counter()
-    for m in filtered_msgs:
-        words = tokenize(m["text"])
-        words_filtered = [w for w in words if w not in STOP_WORDS]
-        keywords_counter.update(words_filtered)
-        
-    top_keywords = [{"keyword": k, "count": c} for k, c in keywords_counter.most_common(limit)]
-    
-    # 2. Trending phrases (N-grams)
-    phrases_counter = Counter()
-    for m in filtered_msgs:
-        words = tokenize(m["text"])
-        
-        # Bigrams (2 words)
-        for i in range(len(words) - 1):
-            phrase = f"{words[i]} {words[i+1]}"
-            if words[i] not in STOP_WORDS or words[i+1] not in STOP_WORDS:
-                phrases_counter[phrase] += 1
-                
-        # Trigrams (3 words)
-        for i in range(len(words) - 2):
-            phrase = f"{words[i]} {words[i+1]} {words[i+2]}"
-            if words[i] not in STOP_WORDS or words[i+1] not in STOP_WORDS or words[i+2] not in STOP_WORDS:
-                phrases_counter[phrase] += 1
-                
-    trending_phrases = [{"phrase": p, "count": c} for p, c in phrases_counter.most_common(limit)]
-    
-    # 3. Recently Flagged terms (focusing on the last 20 messages)
-    recent_msgs = filtered_msgs[-20:]
-    recent_counter = Counter()
-    for m in recent_msgs:
-        words = tokenize(m["text"])
-        words_filtered = [w for w in words if w not in STOP_WORDS]
-        for w in words_filtered:
-            recent_counter[w] += 1
-        for i in range(len(words_filtered) - 1):
-            recent_counter[f"{words_filtered[i]} {words_filtered[i+1]}"] += 1
-            
-    recent_suspicious_terms = [item[0] for item in recent_counter.most_common(limit)]
+        cat_key = None
+
+    if cat_key and cat_key in aggregates:
+        src = aggregates[cat_key]
+    else:
+        # Unknown category: follow existing behavior by using fallback filtering.
+        # We already handled fallback for tiny datasets; for real datasets, default to "default" aggregates.
+        src = aggregates.get("default", {})
+
+    top_keywords = src.get("top_keywords_all", [])[:limit]
+    trending_phrases = src.get("trending_phrases_all", [])[:limit]
+    recent_suspicious_terms = src.get("recent_terms_all", [])[:limit]
+
     if len(recent_suspicious_terms) < 3:
-        # Pad with fallbacks if needed
         recent_suspicious_terms = list(dict.fromkeys(recent_suspicious_terms + FALLBACK_SUSPICIOUS_TERMS))[:limit]
-        
-    # 4. Category Indicators
-    category_indicators = {}
-    for cat in ("spam", "smishing", "offensive"):
-        cat_msgs = [m for m in messages if m["category"] == cat]
-        cat_counter = Counter()
-        for m in cat_msgs:
-            words = tokenize(m["text"])
-            words_filtered = [w for w in words if w not in STOP_WORDS]
-            cat_counter.update(words_filtered)
-        cat_inds = [item[0] for item in cat_counter.most_common(5)]
-        if not cat_inds:
-            cat_inds = FALLBACK_CATEGORY_INDICATORS.get(cat, [])
-        category_indicators[cat] = cat_inds
-        
+
+    category_indicators = aggregates.get("category_indicators", FALLBACK_CATEGORY_INDICATORS)
+
     return {
         "top_keywords": top_keywords,
         "trending_phrases": trending_phrases,
         "recent_suspicious_terms": recent_suspicious_terms,
-        "category_indicators": category_indicators
+        "category_indicators": category_indicators,
     }
+

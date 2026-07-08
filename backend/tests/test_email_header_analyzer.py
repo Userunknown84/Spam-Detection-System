@@ -2,6 +2,7 @@ import io
 import os
 import sys
 from pathlib import Path
+from unittest.mock import patch
 import pytest
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -73,6 +74,22 @@ def client():
     with api_module.app.test_client() as c:
         yield c
 
+@pytest.fixture(autouse=True)
+def mock_default_domain_checker():
+    default_return = {
+        "url": "example.com",
+        "age_days": 365,
+        "creation_date": "2025-01-01",
+        "blacklisted": False,
+        "blacklist_details": {},
+        "threat_intel_details": {},
+        "risk_score": 5,
+        "risk_level": "LOW",
+        "recommendation": "SAFE"
+    }
+    with patch("domain_checker.analyze_domain", return_value=default_return) as mock:
+        yield mock
+
 class TestEmailHeaderAnalyzer:
     def test_valid_trusted_email(self):
         res = analyze_headers(LEGIT_HEADERS)
@@ -115,6 +132,44 @@ class TestEmailHeaderAnalyzer:
         assert res["risk_score"] == 20
         assert res["trust_level"] == "Trusted"
         assert "Sender domain mismatch detected" in res["findings"]
+
+    def test_domain_age_under_30_days(self):
+        mock_result = {
+            "url": "newdomain.com",
+            "age_days": 10,
+            "creation_date": "2026-06-16",
+            "blacklisted": False,
+            "blacklist_details": {},
+            "threat_intel_details": {},
+            "risk_score": 70,
+            "risk_level": "HIGH",
+            "recommendation": "BLOCK"
+        }
+        with patch("domain_checker.analyze_domain", return_value=mock_result):
+            res = analyze_headers(LEGIT_HEADERS)
+            assert res["success"] is True
+            assert res["risk_score"] == 30
+            assert res["trust_level"] == "Suspicious"
+            assert any("recently registered" in f for f in res["findings"])
+
+    def test_domain_blacklisted(self):
+        mock_result = {
+            "url": "malicious.com",
+            "age_days": 365,
+            "creation_date": "2025-01-01",
+            "blacklisted": True,
+            "blacklist_details": {"zen.spamhaus.org": True},
+            "threat_intel_details": {"urlhaus": True},
+            "risk_score": 100,
+            "risk_level": "HIGH",
+            "recommendation": "BLOCK"
+        }
+        with patch("domain_checker.analyze_domain", return_value=mock_result):
+            res = analyze_headers(LEGIT_HEADERS)
+            assert res["success"] is True
+            assert res["risk_score"] == 100
+            assert res["trust_level"] == "High Risk"
+            assert any("blacklisted" in f for f in res["findings"])
 
     def test_invalid_header_input(self, client):
         # API post empty payload

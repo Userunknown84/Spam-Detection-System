@@ -13,7 +13,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import History from './components/History.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 // Register the service worker so the app is installable (PWA) and works offline.
 // Only in production builds — the dev server should not be intercepted by a SW.

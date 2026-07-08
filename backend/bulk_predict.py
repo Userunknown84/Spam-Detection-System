@@ -1,9 +1,14 @@
 import csv
 import io
 import os
+import numpy as np
 from flask import Blueprint, request, jsonify, current_app, send_file
 
 bulk_predict_bp = Blueprint("bulk_predict", __name__)
+
+# Import the shared Limiter instance from api.py
+from api import limiter
+
 
 def parse_and_predict_file(file):
     # Check file extension
@@ -22,70 +27,96 @@ def parse_and_predict_file(file):
         return None, "Empty file uploaded."
         
     try:
-        content = file.read().decode("utf-8")
-    except UnicodeDecodeError:
-        return None, "Corrupted or invalid text encoding."
+        # Use a text wrapper around the uploaded file stream for proper decoding.
+        text_wrapper = io.TextIOWrapper(file.stream, encoding="utf-8", errors="replace")
+    except Exception:
+        return None, "Failed to read uploaded file."
+
+    # Helper for batch inference
+    def _batch_predict(batch_messages):
+        vectorizer = getattr(current_app, "vectorizer", None)
+        model = getattr(current_app, "model", None)
+        label_encoder = getattr(current_app, "label_encoder", None)
+        if not vectorizer or not model or not label_encoder:
+            raise RuntimeError("ML Model dependencies are not loaded.")
+        text_vectors = vectorizer.transform(batch_messages)
+        predictions = model.predict(text_vectors)
+        final_outputs = label_encoder.inverse_transform(predictions)
         
-    messages = []
-    
+        # Compute decisions
+        decisions = model.decision_function(text_vectors)
+        
+        batch_results = []
+        for i, (msg, pred) in enumerate(zip(batch_messages, final_outputs)):
+            pred_str = str(pred)
+            dec_score = float(np.max(np.abs(decisions[i])))
+            prob = 1.0 / (1.0 + np.exp(-dec_score))
+            conf_score = round(prob * 100, 2)
+            
+            if conf_score >= 80:
+                conf_level = "high"
+            elif conf_score >= 60:
+                conf_level = "medium"
+            else:
+                conf_level = "low"
+                
+            batch_results.append({
+                "message": msg,
+                "prediction": pred_str,
+                "result": pred_str,
+                "confidence": round(conf_score / 100.0, 4),
+                "confidence_score": conf_score,
+                "decision_score": dec_score,
+                "confidence_level": conf_level
+            })
+        return batch_results
+
+    BATCH_SIZE = int(os.getenv("BULK_PREDICT_BATCH_SIZE", "256"))
+    results = []
+    batch = []
+
     if filename.endswith(".csv"):
-        f = io.StringIO(content)
         try:
-            reader = csv.DictReader(f)
+            reader = csv.DictReader(text_wrapper)
             fieldnames = reader.fieldnames
             if not fieldnames:
                 return None, "Invalid CSV file structure or missing headers."
-            
-            # Find matching column (case-insensitive and stripped)
             col_name = None
             for h in fieldnames:
                 if h and h.strip().lower() in ("text", "message"):
                     col_name = h
                     break
-            
             if not col_name:
                 return None, "CSV file must contain either a 'text' or 'message' column."
-                
             for row in reader:
                 val = row.get(col_name)
                 if val is not None and val.strip():
-                    messages.append(val.strip())
+                    batch.append(val.strip())
+                    if len(batch) >= BATCH_SIZE:
+                        results.extend(_batch_predict(batch))
+                        batch = []
         except Exception as e:
             return None, f"Failed to parse CSV: {str(e)}"
-            
     else:  # TXT file
-        lines = content.splitlines()
-        messages = [line.strip() for line in lines if line.strip()]
-        
-    if not messages:
+        for line in text_wrapper:
+            line = line.strip()
+            if line:
+                batch.append(line)
+                if len(batch) >= BATCH_SIZE:
+                    results.extend(_batch_predict(batch))
+                    batch = []
+    # Process any remaining messages
+    if batch:
+        results.extend(_batch_predict(batch))
+    if not results:
         return None, "No valid messages found in the file."
-        
-    try:
-        # Get model, vectorizer, and label_encoder from current_app
-        vectorizer = getattr(current_app, "vectorizer", None)
-        model = getattr(current_app, "model", None)
-        label_encoder = getattr(current_app, "label_encoder", None)
-        
-        if not vectorizer or not model or not label_encoder:
-            return None, "ML Model dependencies are not loaded."
-        
-        # Batch predict
-        text_vectors = vectorizer.transform(messages)
-        predictions = model.predict(text_vectors)
-        final_outputs = label_encoder.inverse_transform(predictions)
-        
-        results = []
-        for msg, pred in zip(messages, final_outputs):
-            results.append({
-                "message": msg,
-                "prediction": str(pred)
-            })
-        return results, None
-    except Exception as e:
-        return None, f"Model prediction error: {str(e)}"
+    return results, None
 
 @bulk_predict_bp.route("/bulk-predict", methods=["POST"])
+@limiter.limit("50 per minute")
 def bulk_predict():
+
+
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
     
@@ -128,9 +159,9 @@ def bulk_predict_export():
     try:
         output_io = io.StringIO()
         writer = csv.writer(output_io)
-        writer.writerow(["message", "prediction"])
+        writer.writerow(["message", "prediction", "result", "confidence_score", "decision_score", "confidence_level"])
         for r in results:
-            writer.writerow([r["message"], r["prediction"]])
+            writer.writerow([r["message"], r["prediction"], r["result"], r["confidence_score"], r["decision_score"], r["confidence_level"]])
             
         output_io.seek(0)
         mem = io.BytesIO(output_io.getvalue().encode("utf-8"))

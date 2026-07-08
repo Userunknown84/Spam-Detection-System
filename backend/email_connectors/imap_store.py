@@ -50,6 +50,18 @@ def init_db():
             )
             """
         )
+        # Check if columns exist and add if missing
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(imap_scan_results)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "result" not in columns:
+            conn.execute("ALTER TABLE imap_scan_results ADD COLUMN result TEXT")
+        if "confidence_score" not in columns:
+            conn.execute("ALTER TABLE imap_scan_results ADD COLUMN confidence_score REAL")
+        if "decision_score" not in columns:
+            conn.execute("ALTER TABLE imap_scan_results ADD COLUMN decision_score REAL")
+        if "confidence_level" not in columns:
+            conn.execute("ALTER TABLE imap_scan_results ADD COLUMN confidence_level TEXT")
         conn.commit()
 
 
@@ -137,8 +149,8 @@ def save_scan_results(username, scanned_emails):
         conn.executemany(
             """
             INSERT INTO imap_scan_results
-                (username, message_id, subject, sender, date, prediction, risk_score, trust_level, scanned_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (username, message_id, subject, sender, date, prediction, result, confidence_score, decision_score, confidence_level, risk_score, trust_level, scanned_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 (
@@ -148,6 +160,10 @@ def save_scan_results(username, scanned_emails):
                     e.get("sender"),
                     e.get("date"),
                     e.get("prediction"),
+                    e.get("result"),
+                    e.get("confidence_score"),
+                    e.get("decision_score"),
+                    e.get("confidence_level"),
                     e.get("risk_score"),
                     e.get("trust_level"),
                     now,

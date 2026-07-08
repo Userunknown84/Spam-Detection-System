@@ -17,6 +17,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 import api as api_module
 from flask_jwt_extended import create_access_token
+from conftest import TEST_INTERNAL_SECRET
 
 @pytest.fixture
 def client():
@@ -27,7 +28,7 @@ def client():
 
 def test_gmail_emails_with_valid_secret(client):
     headers = {
-        "X-Internal-Secret": "super-secret-internal-key",
+        "X-Internal-Secret": TEST_INTERNAL_SECRET,
         "X-User-Username": "test_user"
     }
     api_module.TOKEN_STORE["test_user"] = {
@@ -55,7 +56,7 @@ def test_gmail_emails_invalid_secret(client):
 
 def test_imap_require_username_with_secret(client):
     headers = {
-        "X-Internal-Secret": "super-secret-internal-key",
+        "X-Internal-Secret": TEST_INTERNAL_SECRET,
         "X-User-Username": "test_user"
     }
     

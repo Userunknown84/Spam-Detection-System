@@ -2,6 +2,7 @@ import os
 import sys
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 BACKEND_DIR = BASE_DIR / "backend"
@@ -16,6 +17,22 @@ sys.path.insert(0, str(BACKEND_DIR / "email_connectors"))
 
 import api as api_module
 from email_scanner import scan_emails_with_model
+
+@pytest.fixture(autouse=True)
+def mock_default_domain_checker():
+    default_return = {
+        "url": "example.com",
+        "age_days": 365,
+        "creation_date": "2025-01-01",
+        "blacklisted": False,
+        "blacklist_details": {},
+        "threat_intel_details": {},
+        "risk_score": 5,
+        "risk_level": "LOW",
+        "recommendation": "SAFE"
+    }
+    with patch("domain_checker.analyze_domain", return_value=default_return) as mock:
+        yield mock
 
 def test_scan_emails_with_model():
     # Push Flask application context so that current_app can resolve model attributes
@@ -57,3 +74,37 @@ def test_scan_emails_with_model():
         assert email_2["id"] == "2"
         assert "prediction" in email_2
         assert email_2["trust_level"] == "Trusted"
+
+def test_scan_emails_with_model_no_headers_fallback():
+    with api_module.app.app_context():
+        emails = [
+            {
+                "id": "3",
+                "subject": "Hello",
+                "body": "Hi there",
+                "sender": "newdomain@scammy.com",
+                "date": "2026-06-18"
+                # raw_headers is missing!
+            }
+        ]
+        
+        # Mock recently registered domain (< 30 days old)
+        mock_result = {
+            "url": "scammy.com",
+            "age_days": 15,
+            "creation_date": "2026-06-11",
+            "blacklisted": False,
+            "blacklist_details": {},
+            "threat_intel_details": {},
+            "risk_score": 70,  # 40 + 30
+            "risk_level": "HIGH",
+            "recommendation": "BLOCK"
+        }
+        
+        with patch("domain_checker.analyze_domain", return_value=mock_result):
+            results = scan_emails_with_model(emails)
+            assert results["total_scanned"] == 1
+            email = results["emails"][0]
+            assert email["id"] == "3"
+            assert email["risk_score"] == 70
+            assert email["trust_level"] == "High Risk"

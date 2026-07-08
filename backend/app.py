@@ -11,6 +11,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import numpy as np
 
 load_dotenv()
 
@@ -42,9 +43,12 @@ def log_request(response):
     return response
 
 # ─── RATE LIMITER ────────────────────────────────────────────────
+def get_forwarded_address():
+    return request.headers.get("X-Forwarded-For", request.remote_addr)
+
 limiter = Limiter(
     app=app,
-    key_func=get_remote_address,
+    key_func=get_forwarded_address,
     default_limits=["10 per minute"],
     storage_uri="memory://",
     strategy="fixed-window",
@@ -108,6 +112,39 @@ def health_check():
     return jsonify(status), 200
 
 
+def make_prediction_response(
+    input_text,
+    result,
+    confidence_score,
+    decision_score,
+    confidence_level,
+    detected_language="en",
+    translated=False,
+    translated_text=None,
+    domain_analysis=None,
+    explanation=None
+):
+    """Enforces a strict standardized response schema for all predictions."""
+    response = {
+        "input": input_text,
+        "result": result,
+        "prediction": result,
+        "confidence": round(float(confidence_score) / 100.0, 4) if confidence_score is not None else 0.0,
+        "confidence_score": float(confidence_score) if confidence_score is not None else 0.0,
+        "decision_score": float(decision_score) if decision_score is not None else None,
+        "confidence_level": confidence_level,
+        "detected_language": detected_language,
+        "translated": translated
+    }
+    if translated and translated_text:
+        response["translated_text"] = translated_text
+    if domain_analysis is not None:
+        response["domain_analysis"] = domain_analysis
+    if explanation is not None:
+        response["explanation"] = explanation
+    return response
+
+
 # ─── PREDICT ENDPOINT ────────────────────────────────────────────
 @app.route("/predict", methods=["POST"])
 @limiter.limit("10 per minute")
@@ -120,18 +157,72 @@ def predict():
             logger.warning("No text provided for prediction")
             return jsonify({"error": "No text provided"}), 400
 
+        # Translate incoming text to English if it is not in English
+        original_text = text
+        detected_language = "en"
+        translated = False
+        
+        if text.strip():
+            try:
+                from langdetect import detect
+                detected_language = detect(text)
+            except Exception:
+                detected_language = "en"
+                
+            if detected_language != "en":
+                try:
+                    from deep_translator import GoogleTranslator
+                    translated_text = GoogleTranslator(source='auto', target='en').translate(text)
+                    if translated_text and translated_text.strip().lower() != text.strip().lower():
+                        text = translated_text
+                        translated = True
+                except Exception:
+                    pass
+
         text_vector = vectorizer.transform([text])
         prediction = model.predict(text_vector)
         final_output = label_encoder.inverse_transform(prediction)[0]
 
         logger.info(f"Prediction: '{text[:50]}...' -> {final_output}")
             
-        return jsonify({"input": text, "prediction": final_output})
+        decision_score = None
+        confidence_score = 95.0
+        try:
+            if hasattr(model, "decision_function"):
+                decision = model.decision_function(text_vector)
+                if isinstance(decision, np.ndarray):
+                    decision_score = float(np.max(np.abs(decision)))
+                else:
+                    decision_score = float(abs(decision))
+                # Convert to pseudo‑probability
+                prob = 1.0 / (1.0 + np.exp(-decision_score))
+                confidence_score = round(prob * 100, 2)
+        except Exception:
+            confidence_score = 0.0
+            decision_score = None
+
+        if confidence_score >= 80:
+            confidence_level = "high"
+        elif confidence_score >= 60:
+            confidence_level = "medium"
+        else:
+            confidence_level = "low"
+
+        response_data = make_prediction_response(
+            input_text=original_text,
+            result=final_output,
+            confidence_score=confidence_score,
+            decision_score=decision_score,
+            confidence_level=confidence_level,
+            detected_language=detected_language,
+            translated=translated,
+            translated_text=text if translated else None
+        )
+        return jsonify(response_data)
 
     except Exception as e:
         logger.error(f"Prediction error: {str(e)}")
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == "__main__":
     FLASK_PORT = int(os.getenv("FLASK_PORT", 5000))

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import api from '../utils/axiosInstance';
 
 const WordCloud = ({ darkMode }) => {
   const [words, setWords] = useState([]);
@@ -8,13 +9,12 @@ const WordCloud = ({ darkMode }) => {
   const fetchWordcloud = useCallback(() => {
     setLoading(true);
     setError(null);
-    fetch('/api/wordcloud')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setWords(data.data);
+    api.get('/api/wordcloud')
+      .then(res => {
+        if (res.data.success) {
+          setWords(res.data.data);
         } else {
-          setError(data.error || 'Request failed');
+          setError(res.data.error || 'Request failed');
         }
         setLoading(false);
       })

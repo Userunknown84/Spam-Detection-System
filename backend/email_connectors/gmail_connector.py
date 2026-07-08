@@ -1,6 +1,7 @@
 import os
 import urllib.parse
 import requests
+from concurrent.futures import ThreadPoolExecutor
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
@@ -42,6 +43,16 @@ def refresh_gmail_token(refresh_token):
     response.raise_for_status()
     return response.json()
 
+def fetch_single_message(msg_id, headers):
+    """Fetches details for a single email message from Gmail API."""
+    try:
+        msg_r = requests.get(f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}", headers=headers)
+        if msg_r.status_code == 200:
+            return msg_r.json()
+    except Exception:
+        pass
+    return None
+
 def fetch_gmail_emails(access_token, limit=50):
     """Fetches latest email headers and snippets from Gmail API."""
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -51,13 +62,17 @@ def fetch_gmail_emails(access_token, limit=50):
     
     emails = []
     messages = res.get("messages", [])
-    for m in messages:
-        msg_id = m["id"]
-        # Fetch individual message details
-        msg_r = requests.get(f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg_id}", headers=headers)
-        if msg_r.status_code != 200:
+    
+    # Fetch details concurrently using ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        msg_ids = [m["id"] for m in messages]
+        results = list(executor.map(lambda mid: fetch_single_message(mid, headers), msg_ids))
+        
+    for msg_data in results:
+        if not msg_data:
             continue
-        msg_data = msg_r.json()
+            
+        msg_id = msg_data.get("id")
         
         # Parse headers
         payload_headers = msg_data.get("payload", {}).get("headers", [])

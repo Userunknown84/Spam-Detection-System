@@ -176,7 +176,7 @@ const Register = () => {
               onError={() => setError('Google Sign-in failed. Please try again.')}
               theme={isDark ? "dark" : "outline"}
               shape="rectangular"
-              width="100%"
+              width={350}
             />
           </div>
         </div>
