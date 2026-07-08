@@ -203,8 +203,7 @@ const Login = () => {
           >
             Register here
           </Link>
-        </p>
-      </div>
+     </p>
     </div>
   );
 };
