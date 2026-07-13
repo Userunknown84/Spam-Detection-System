@@ -24,7 +24,7 @@ jobs:
         run: docker build -t spam-frontend:ci -f frontend/Dockerfile --build-arg VITE_API_URI=/predict frontend
 
       - name: Start ML API container
-        run: docker run --rm -d -p 5000:5000 --name spam_ml_api_ci spam-ml-api:ci
+        run: docker run --rm -d -p 5000:5000 -e FLASK_HOST=0.0.0.0 --name spam_ml_api_ci spam-ml-api:ci
 
       - name: Smoke test - ML API responds on port 5000
         run: |
