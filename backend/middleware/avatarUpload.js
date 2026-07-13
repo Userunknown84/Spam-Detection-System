@@ -1,24 +1,43 @@
-// Avatar upload hardening (issue #447): validate file size and MIME type
-// before the upload is fully buffered into memory, and translate multer's
-// rejections into clear 400 responses instead of leaking 500s.
 const multer = require('multer');
+const { fileTypeFromBuffer } = require('file-type');
 
-// 5MB cap. multer enforces this against the stream, so oversized uploads are
-// rejected before the whole file is buffered into RAM.
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
-
-// Only real raster image types the avatar pipeline (sharp) can process.
 const ALLOWED_AVATAR_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const storage = multer.memoryStorage();
 
-const fileFilter = (req, file, cb) => {
-  if (ALLOWED_AVATAR_MIME_TYPES.includes(file.mimetype)) {
+const fileFilter = async (req, file, cb) => {
+  try {
+    if (!file || !file.buffer) {
+      return cb(new Error('No file uploaded'), false);
+    }
+
+    const mimeType = file.mimetype;
+    if (!ALLOWED_AVATAR_MIME_TYPES.includes(mimeType)) {
+      return cb(new Error('Invalid file type. Only JPEG, PNG, and WEBP images are allowed.'), false);
+    }
+
+    const detectedType = await fileTypeFromBuffer(file.buffer);
+    
+    if (!detectedType) {
+      return cb(new Error('Unable to detect file type. Please upload a valid image.'), false);
+    }
+
+    if (!ALLOWED_AVATAR_MIME_TYPES.includes(detectedType.mime)) {
+      return cb(new Error(
+        `File content is "${detectedType.mime}", but expected an image (${ALLOWED_AVATAR_MIME_TYPES.join(', ')}).`
+      ), false);
+    }
+
+    if (detectedType.mime !== mimeType) {
+      return cb(new Error(
+        `MIME type mismatch: declared "${mimeType}" but detected "${detectedType.mime}"`
+      ), false);
+    }
+
     cb(null, true);
-  } else {
-    // A plain Error (not a MulterError) so the handler below surfaces this
-    // specific message rather than a generic multer code.
-    cb(new Error('Invalid file type. Only JPEG, PNG, and WEBP images are allowed.'));
+  } catch (error) {
+    cb(new Error(`File validation failed: ${error.message}`), false);
   }
 };
 
@@ -28,8 +47,6 @@ const upload = multer({
   limits: { fileSize: MAX_AVATAR_BYTES },
 });
 
-// Wraps `upload.single('avatar')` so multer/filter errors become 400s with a
-// clear message instead of propagating to the global handler as a 500.
 const handleAvatarUpload = (req, res, next) => {
   upload.single('avatar')(req, res, (err) => {
     if (!err) {
@@ -44,13 +61,34 @@ const handleAvatarUpload = (req, res, next) => {
       }
       return res.status(400).json({ error: err.message });
     }
-    // fileFilter rejection (invalid type) or any other upload error.
     return res.status(400).json({ error: err.message || 'File upload failed.' });
   });
+};
+
+const validateFileContent = async (fileBuffer) => {
+  if (!fileBuffer || fileBuffer.length === 0) {
+    throw new Error('File is empty');
+  }
+
+  if (fileBuffer.length > MAX_AVATAR_BYTES) {
+    throw new Error(`File size exceeds ${MAX_AVATAR_BYTES / (1024 * 1024)}MB limit`);
+  }
+
+  const detectedType = await fileTypeFromBuffer(fileBuffer);
+  if (!detectedType) {
+    throw new Error('Unable to detect file type. Please upload a valid image.');
+  }
+
+  if (!ALLOWED_AVATAR_MIME_TYPES.includes(detectedType.mime)) {
+    throw new Error(`Invalid image type: ${detectedType.mime}. Allowed: ${ALLOWED_AVATAR_MIME_TYPES.join(', ')}`);
+  }
+
+  return detectedType;
 };
 
 module.exports = {
   handleAvatarUpload,
   MAX_AVATAR_BYTES,
   ALLOWED_AVATAR_MIME_TYPES,
+  validateFileContent,
 };
