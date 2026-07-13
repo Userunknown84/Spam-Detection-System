@@ -290,9 +290,8 @@ router.post("/predict", predictLimiter, preventCacheStampede, protect, checkCach
 });
 
 router.post("/feedback", protect, async (req, res) => {
+  const { text, predicted_label, correct_label } = req.body;
  try {
-    const { text, predicted_label, correct_label } = req.body;
-
     if (!text || !correct_label) {
       return res
         .status(400)
@@ -630,20 +629,20 @@ router.get('/stats', protect, async (req, res) => {
     today.setHours(0, 0, 0, 0);
 
     // Get all predictions for user
-    const predictions = await Prediction.find({ userId });
-    
+    const predictions = await History.find({ user: userId });
+
     // Calculate stats
     const total = predictions.length;
-    const todayCount = predictions.filter(p => 
+    const todayCount = predictions.filter(p =>
       new Date(p.createdAt) >= today
     ).length;
-    
+
     // Spam vs Ham breakdown
-    const spamCount = predictions.filter(p => 
-      p.result === 'spam' || p.result === 'smishing'
+    const spamCount = predictions.filter(p =>
+      p.prediction === 'spam' || p.prediction === 'smishing'
     ).length;
-    const hamCount = predictions.filter(p => 
-      p.result === 'ham' || p.result === 'safe'
+    const hamCount = predictions.filter(p =>
+      p.prediction === 'ham' || p.prediction === 'safe'
     ).length;
 
     res.json({

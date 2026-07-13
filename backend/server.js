@@ -29,19 +29,6 @@ require('./jobs/webhookRetryCron');
 const { preventCacheStampede } = require('./middleware/cacheMiddleware');
 // Add EvoMail routes
 const evoMailRoutes = require('./routes/evoMailRoutes');
-app.use('/api/evomail', evoMailRoutes);
-// ===== STARTUP TIMER =====
-const SERVER_START_TIME = Date.now();
-const startupLogs = [];
-// Add VBSF routes
-const visualRoutes = require('./routes/visualRoutes');
-app.use('/api/visual', visualRoutes);
-const logStartupTime= (component, startTime) => {
-
-
-// Add EvoMail routes
-const evoMailRoutes = require('./routes/evoMailRoutes');
-app.use('/api/evomail', evoMailRoutes);
 
 const healthRoutes = require("./routes/healthRoutes");
 const predictionRoutes = require("./routes/predictionRoutes");
@@ -78,6 +65,8 @@ const app = express();
 // Apply standard throttling to the heavy ML prediction route
 const { apiLimiter } = require('./middleware/rateLimiter');
 app.use('/predict', apiLimiter);
+
+app.use('/api/evomail', evoMailRoutes);
 
 // Trust the first proxy so express-rate-limit correctly identifies user IPs
 
@@ -162,6 +151,7 @@ const monitorConnectionPool = () => {
         }
       }
     } catch (err) {
+      logger.error('[DB Pool] Failed to log connection pool stats:', err.message);
     }
   }, 60000); // every 60 seconds
 

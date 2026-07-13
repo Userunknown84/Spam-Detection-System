@@ -10,4 +10,4 @@ const config = {
 
 const env = process.env.NODE_ENV || 'development';
 
-module.exports = config[env] || configs.development;
+module.exports = config[env] || config.development;
