@@ -20,6 +20,7 @@ import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import EmailHeaderAnalyzer from "../components/EmailHeaderAnalyzer";
 import BulkSpamDetection from "../components/BulkSpamDetection";
+import { ResultBadge } from './components/ResultBadge';
 import SpamInsightsDashboard from "../components/SpamInsightsDashboard";
 import EmailScannerDashboard from "../components/EmailScannerDashboard";
 import Chatbot from "../components/Chatbot";
@@ -49,6 +50,12 @@ function App() {
   const [hasCelebrated, setHasCelebrated] = useState(() => {
     return localStorage.getItem("firstPrediction") === "true";
   });
+  const [showCelebration, setShowCelebration] = useState(false);
+
+  const [darkMode, setDarkMode] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [theme, setTheme] = useState("ocean");
+  const [showThemes, setShowThemes] = useState(false);
 
   const [showSettings, setShowSettings] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
@@ -60,6 +67,14 @@ function App() {
   });
 
   const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Detect URLs in text
+  const detectURLs = (text) => {
+    if (!text) return [];
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+     const matches = text.match(urlRegex);
+      return matches || [];
+    };
 
   const playSpamSound = () => {
     if (!soundEnabled) return;
@@ -77,10 +92,64 @@ function App() {
         osc.start(ctx.currentTime + delay);
         osc.stop(ctx.currentTime + delay + 0.15);
       });
-    } catch {
+    } catch (e) {
       /* silent fail */
     }
   };
+
+  // Helper to get earned badges (returns array of badge objects)
+  const getEarnedBadges = () => {
+    try {
+      const streakCount = parseInt(localStorage.getItem('predictionStreak') || '0', 10);
+      return Object.keys(Badges)
+        .map((k) => ({ day: Number(k), ...Badges[k] }))
+        .filter((b) => streakCount >= b.day);
+    } catch (e) {
+      return [];
+    }
+  };
+
+  // Placeholder for badge checking logic
+  const checkNewBadge = (newStreak) => {
+    // simple implementation: if new streak matches a badge threshold, show popup
+    if (Badges[newStreak]) {
+      setNewBadgeEarned(true);
+      setShowBadgePopup(true);
+      setTimeout(() => setShowBadgePopup(false), 4000);
+    }
+  };
+
+  //Streak tracking
+  const [streak, setStreak] = useState(() => {
+    const lastDate = localStorage.getItem("lastPredictionDate");
+    const streakCount = parseInt(localStorage.getItem("streakCount") || "0", 10);
+    const today = new Date().toDateString();
+
+    if (lastDate === today) return streakCount;
+    if(lastDate){
+      const last = new Date(lastDate);
+      const now = new Date();
+      const diffTime = now - last;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+      if (diffDays === 1) return streakCount + 1;
+      if (diffDays > 1) return 0;
+    }
+    return streakCount;
+  });
+
+  const [newBadgeEarned, setNewBadgeEarned] = useState(false);
+  const [showBadgePopup, setShowBadgePopup] = useState(false);
+
+  //Badge Definitions
+  const Badges = {
+     3: { name: '🔥 Novice Streaker', icon: '🔥', color: 'bg-orange-500', description: '3 day streak' },
+     7: { name: '⚡ Weekly Warrior', icon: '⚡', color: 'bg-blue-500', description: '7 day streak' },
+     14: { name: '🌟 Fortnight Champion', icon: '🌟', color: 'bg-purple-500', description: '14 day streak' },
+     30: { name: '🏆 Monthly Master', icon: '🏆', color: 'bg-yellow-500', description: '30 day streak' },
+     50: { name: '💎 Diamond Streaker', icon: '💎', color: 'bg-cyan-500', description: '50 day streak' },
+     100: { name: '👑 Legendary Streaker', icon: '👑', color: 'bg-red-500', description: '100 day streak' },
+    };
 
   const playHamSound = () => {
     if (!soundEnabled) return;
@@ -98,7 +167,7 @@ function App() {
         osc.start(ctx.currentTime + i * 0.12);
         osc.stop(ctx.currentTime + i * 0.12 + 0.15);
       });
-    } catch { /* silent fail */ }
+    } catch (e) { /* silent fail */ }
   };
 
   const { user, login, logout } = useAuth();
@@ -203,7 +272,7 @@ function App() {
 const analyzeEmojiSentiment = (text) => {
   if (!text) return { positive: 0, negative: 0, neutral: 0 };
 
-  const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|[\uD83C-\uDBFF\uDC00-\uDFFF])/gu;
+  const emojiRegex = /([\u2700-\u27BF]|[\uE000-\uF8FF]|[\uD83C-\uDBFF\uDC00-\uDFFF])/g;
   const matches = text.match(emojiRegex) || [];
 
   if (matches.length === 0) return { positive: 0, negative: 0, neutral: 0 };
@@ -327,8 +396,31 @@ const analyzeEmojiSentiment = (text) => {
     message: errorMessage,
     retryable: retryable
   });
-    } finally {
+  } finally {
       setLoading(false);
+
+function App() {
+  const [showButton, setShowButton] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowButton(window.scrollY > 300);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const getColor = () => {
+    if (result === "ham" || result === "safe")
+      return "text-green-600 dark:text-green-400";
+    if (result === "spam" || result === "malicious")
+      return "text-red-600 dark:text-red-400";
+    if (result === "smishing") return "text-orange-600 dark:text-orange-400";
+    if (result === "Error") {
+      return isDark ? "text-yellow-300" : "text-yellow-700";
     }
   };
 
@@ -346,6 +438,9 @@ const analyzeEmojiSentiment = (text) => {
     setTimeout(() => {
       confetti({ particleCount: 50, spread: 50, origin: { y: 0.6, x: 0.7 } });
     }, 400);
+    setTimeout(() => {
+      setShowCelebration(true);
+    }, 500);
   };
 
   const confidencePct = confidence !== null ? Math.min(confidence * 50 + 50, 100).toFixed(1) : "0.0";
@@ -540,20 +635,18 @@ const analyzeEmojiSentiment = (text) => {
                 onClick={() => setActiveTab("rules")}
                 className={`pb-1 px-4 transition-all border-b-2 ${activeTab === "rules" ? "border-current opacity-100" : "border-transparent opacity-50 hover:opacity-75"}`}
               >
-                Rules Manager
-              </button>
               <button
                  onClick={() => setShowPatternLibrary(true)}
                  className="px-4 py-2.5 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 shadow-md"
               >
               Patterns
               </button>
+                Rules Manager
+              </button>
               <button
                 onClick={() => setActiveTab("history")}
                 className={`pb-1 px-4 transition-all border-b-2 ${activeTab === "history" ? "border-current opacity-100" : "border-transparent opacity-50 hover:opacity-75"}`}
               >
-                History
-              </button>
               {(result === "spam" || result === "malicious" || result === "smishing") && (
               <button
               onClick={() => setShowDeSpamify(true)}
@@ -562,6 +655,9 @@ const analyzeEmojiSentiment = (text) => {
               De-Spamify Message
               </button>
               )}
+
+                History
+              </button>
               <button
                 onClick={() => navigate("/dashboard")}
                 className="pb-1 px-4 transition-all border-b-2 border-transparent opacity-50 hover:opacity-75"
@@ -807,27 +903,27 @@ const analyzeEmojiSentiment = (text) => {
                     ))}
 
                     {/* Emoji Sentiment Analysis */}
-                    {result && result !== "Error" && text && analyzeEmojiSentiment(text).count > 0 && (
+                    {result && result !== "Error" && text && analyzeEmojis(text).count > 0 && (
                      <div className="mt-4 pt-3 border-t border-slate-700/20">
                       <p className="text-xs font-semibold opacity-70 mb-2 flex items-center gap-1">
                          <span>😊</span> Emoji Sentiment
                       </p>
                      <div className="flex flex-wrap items-center gap-3">
                         <span className="text-lg">
-                        {analyzeEmojiSentiment(text).emojis.join(' ')}
+                        {analyzeEmojis(text).emojis.join(' ')}
                          </span>
                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                         analyzeEmojiSentiment(text).sentiment === 'positive' 
+                         analyzeEmojis(text).sentiment === 'positive' 
                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                         : analyzeEmojiSentiment(text).sentiment === 'negative'
+                         : analyzeEmojis(text).sentiment === 'negative'
                          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                          : 'bg-gray-100 text-gray-700 dark:bg-gray-800/30 dark:text-gray-400'
                         }`}>
-                        {analyzeEmojiSentiment(text).sentiment === 'positive' && '😊 Positive'}
-                        {analyzeEmojiSentiment(text).sentiment === 'negative' && '😢 Negative'}
-                        {analyzeEmojiSentiment(text).sentiment === 'neutral' && '😐 Neutral'}
+                        {analyzeEmojis(text).sentiment === 'positive' && '😊 Positive'}
+                        {analyzeEmojis(text).sentiment === 'negative' && '😢 Negative'}
+                        {analyzeEmojis(text).sentiment === 'neutral' && '😐 Neutral'}
                         </span>
-                        {analyzeEmojiSentiment(text).spamDetected && (
+                        {analyzeEmojis(text).spamDetected && (
                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500 text-white">
                           ⚠️ Spam Emojis
                          </span>
@@ -905,12 +1001,6 @@ const analyzeEmojiSentiment = (text) => {
                 </div>
                 )}
 
-                <SpamPatternLibrary
-                  isOpen={showPatternLibrary}
-                  onClose={() => setShowPatternLibrary(false)}
-                  darkMode={isDark}
-                />
-
 
                 <FeatureImportance darkMode={isDark} />
                 <CensorshipMode text={text} darkMode={isDark} />
@@ -967,7 +1057,6 @@ const analyzeEmojiSentiment = (text) => {
           ) : (
             <EmailHeaderAnalyzer />
           )}
-          </div>
           <WordCloud darkMode={isDark} />
         </div>
       </div>
