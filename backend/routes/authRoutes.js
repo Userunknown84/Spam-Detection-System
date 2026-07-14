@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const upload = multer();
+const { handleAvatarUpload } = require('../middleware/avatarUpload');
 
 const {
   register,
@@ -57,7 +56,7 @@ router.post('/google', apiLimiter, googleLogin);
 
 // @desc    Update user avatar
 // @route   POST /api/auth/avatar
-router.post('/avatar', protect, upload.single('avatar'), updateAvatar);
+router.post('/avatar', protect, handleAvatarUpload, updateAvatar);
 
 // @desc    Forgot password - Send reset link
 // @route   POST /api/auth/forgot-password

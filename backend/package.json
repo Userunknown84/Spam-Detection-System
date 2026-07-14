@@ -13,6 +13,9 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
   "dependencies": {
     "@sentry/node": "^10.60.0",
     "@sentry/profiling-node": "^10.60.0",
@@ -28,6 +31,7 @@
     "express-rate-limit": "^8.5.2",
     "express-validator": "^7.3.2",
     "figlet": "^1.11.0",
+    "file-type": "^22.0.1",
     "form-data": "^4.0.6",
     "google-auth-library": "^10.7.0",
     "groq-sdk": "^1.2.1",

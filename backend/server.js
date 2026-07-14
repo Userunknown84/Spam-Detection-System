@@ -151,7 +151,7 @@ const monitorConnectionPool = () => {
         }
       }
     } catch (err) {
-      logger.error('[DB Pool] Failed to log connection pool stats:', err.message);
+      logger.error('[DB Pool] Failed to log connection pool stats:', err);
     }
   }, 60000); // every 60 seconds
 

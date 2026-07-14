@@ -290,8 +290,9 @@ router.post("/predict", predictLimiter, preventCacheStampede, protect, checkCach
 });
 
 router.post("/feedback", protect, async (req, res) => {
-  const { text, predicted_label, correct_label } = req.body;
+  let text, predicted_label, correct_label;
  try {
+    ({ text, predicted_label, correct_label } = req.body || {});
     if (!text || !correct_label) {
       return res
         .status(400)
