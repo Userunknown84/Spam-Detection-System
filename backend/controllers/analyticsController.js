@@ -42,19 +42,78 @@ const getUserObjectId = (req) => {
   return new mongoose.Types.ObjectId(userId);
 };
 
+const buildDateFilter = (query) => {
+  const { from, to, last } = query;
+  let fromDate, toDate;
+  const filter = {};
+
+  // Case 1: `last` parameter (e.g. last=7, last=30)
+  if (last !== undefined) {
+    const days = parseInt(last, 10);
+    if (isNaN(days) || days <= 0) {
+      throw new Error('Invalid "last" parameter. Must be a positive integer.');
+    }
+    if (from !== undefined || to !== undefined) {
+      throw new Error('Cannot combine "last" with "from" or "to".');
+    }
+    toDate = new Date();
+    fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - days);
+  } else {
+    // Case 2: `from` and `to` parameters
+    if (from !== undefined) {
+      fromDate = new Date(from);
+      if (isNaN(fromDate.getTime())) {
+        throw new Error('Invalid "from" date format. Please use ISO format (YYYY-MM-DD).');
+      }
+    }
+    if (to !== undefined) {
+      toDate = new Date(to);
+      if (isNaN(toDate.getTime())) {
+        throw new Error('Invalid "to" date format. Please use ISO format (YYYY-MM-DD).');
+      }
+      // Set to end of day so the full date is included
+      toDate.setHours(23, 59, 59, 999);
+    }
+  }
+
+  if (fromDate && toDate && fromDate > toDate) {
+    throw new Error('"from" date cannot be later than "to" date.');
+  }
+
+  if (fromDate) filter.$gte = fromDate;
+  if (toDate) filter.$lte = toDate;
+
+  return filter;
+};
+
 // GET /analytics/summary
 const getSummary = async (req, res) => {
   try {
     const userId = getUserObjectId(req);
+
+    // 🔥 Date filter
+    let dateFilter = {};
+    try {
+      dateFilter = buildDateFilter(req.query);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    const matchStage = {
+      user: userId,
+      prediction: { $exists: true, $ne: null },
+      type: { $exists: true, $ne: null },
+    };
+    // Merge base existence checks with date range
+    const createdAtMatch = { $exists: true, $ne: null };
+    if (dateFilter.$gte || dateFilter.$lte) {
+      Object.assign(createdAtMatch, dateFilter);
+    }
+    matchStage.createdAt = createdAtMatch;
+
     const counts = await History.aggregate([
-      {
-        $match: {
-          user: userId,
-          prediction: { $exists: true, $ne: null },
-          type: { $exists: true, $ne: null },
-          createdAt: { $exists: true, $ne: null }
-        }
-      },
+      { $match: matchStage },
       { $group: { _id: "$prediction", count: { $sum: 1 } } },
     ]);
 
@@ -72,7 +131,6 @@ const getSummary = async (req, res) => {
       else unknownCount += count;
     });
 
-    // Also include unknown counts in the response
     const unknownLabelCount = unknownCount;
     const unknownPercentage = pct(unknownCount, totalScanned);
 
@@ -103,15 +161,28 @@ const getTrends = async (req, res) => {
       : "daily";
 
     const userId = getUserObjectId(req);
+
+    // 🔥 Date filter
+    let dateFilter = {};
+    try {
+      dateFilter = buildDateFilter(req.query);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    const matchStage = {
+      user: userId,
+      prediction: { $exists: true, $ne: null },
+      type: { $exists: true, $ne: null },
+    };
+    const createdAtMatch = { $exists: true, $ne: null };
+    if (dateFilter.$gte || dateFilter.$lte) {
+      Object.assign(createdAtMatch, dateFilter);
+    }
+    matchStage.createdAt = createdAtMatch;
+
     const trends = await History.aggregate([
-      {
-        $match: {
-          user: userId,
-          prediction: { $exists: true, $ne: null },
-          type: { $exists: true, $ne: null },
-          createdAt: { $exists: true, $ne: null }
-        }
-      },
+      { $match: matchStage },
       {
         $group: {
           _id: {
@@ -124,7 +195,6 @@ const getTrends = async (req, res) => {
       { $sort: { "_id.date": 1 } },
     ]);
 
-    // Map unknown labels to "unknown" for consistency
     const formattedTrends = trends.map(({ _id, count }) => ({
       date: _id.date,
       label: classifyLabel(_id.label) === "unknown" ? "unknown" : _id.label,
@@ -142,15 +212,28 @@ const getTrends = async (req, res) => {
 const getBreakdown = async (req, res) => {
   try {
     const userId = getUserObjectId(req);
+
+    // 🔥 Date filter
+    let dateFilter = {};
+    try {
+      dateFilter = buildDateFilter(req.query);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    const matchStage = {
+      user: userId,
+      prediction: { $exists: true, $ne: null },
+      type: { $exists: true, $ne: null },
+    };
+    const createdAtMatch = { $exists: true, $ne: null };
+    if (dateFilter.$gte || dateFilter.$lte) {
+      Object.assign(createdAtMatch, dateFilter);
+    }
+    matchStage.createdAt = createdAtMatch;
+
     const breakdown = await History.aggregate([
-      {
-        $match: {
-          user: userId,
-          prediction: { $exists: true, $ne: null },
-          type: { $exists: true, $ne: null },
-          createdAt: { $exists: true, $ne: null }
-        }
-      },
+      { $match: matchStage },
       {
         $group: {
           _id: { type: "$type", label: "$prediction" },
@@ -159,7 +242,6 @@ const getBreakdown = async (req, res) => {
       },
     ]);
 
-    // Map unknown labels to "unknown"
     const formattedBreakdown = breakdown.map(({ _id, count }) => ({
       type: _id.type,
       label: classifyLabel(_id.label) === "unknown" ? "unknown" : _id.label,
@@ -177,15 +259,28 @@ const getBreakdown = async (req, res) => {
 const getPersonalSummary = async (req, res) => {
   try {
     const userId = getUserObjectId(req);
+
+    // 🔥 Date filter
+    let dateFilter = {};
+    try {
+      dateFilter = buildDateFilter(req.query);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    const matchStage = {
+      user: userId,
+      prediction: { $exists: true, $ne: null },
+      type: { $exists: true, $ne: null },
+    };
+    const createdAtMatch = { $exists: true, $ne: null };
+    if (dateFilter.$gte || dateFilter.$lte) {
+      Object.assign(createdAtMatch, dateFilter);
+    }
+    matchStage.createdAt = createdAtMatch;
+
     const stats = await History.aggregate([
-      {
-        $match: {
-          user: userId,
-          prediction: { $exists: true, $ne: null },
-          type: { $exists: true, $ne: null },
-          createdAt: { $exists: true, $ne: null }
-        }
-      },
+      { $match: matchStage },
       {
         $group: {
           _id: null,
