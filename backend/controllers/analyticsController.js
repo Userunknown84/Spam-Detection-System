@@ -98,9 +98,16 @@ const getSummary = async (req, res) => {
 // GET /analytics/trends?range=daily|weekly|monthly
 const getTrends = async (req, res) => {
   try {
-    const range = ANALYTICS_RANGES.includes(req.query.range)
-      ? req.query.range
-      : "daily";
+    const { range } = req.query;
+
+    if (range !== undefined && !ANALYTICS_RANGES.includes(range)) {
+      return res.status(400).json({
+        error: `Invalid range value. Supported values are: ${ANALYTICS_RANGES.join(', ')}.`
+      });
+    }
+
+    // If range is not provided, default to 'daily'
+    const selectedRange = range || "daily";
 
     const userId = getUserObjectId(req);
     const trends = await History.aggregate([
@@ -115,7 +122,7 @@ const getTrends = async (req, res) => {
       {
         $group: {
           _id: {
-            date: { $dateToString: { format: DATE_FORMATS[range], date: "$createdAt" } },
+            date: { $dateToString: { format: DATE_FORMATS[selectedRange], date: "$createdAt" } },
             label: "$prediction",
           },
           count: { $sum: 1 },
