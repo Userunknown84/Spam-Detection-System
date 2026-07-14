@@ -268,6 +268,8 @@ module.exports = {
   bulkPredictLimiter,
   exportLimiter,
   feedbackLimiter,
+
+  // OTP limiters
   otpLimiter,
   verificationLimiter,
   PREDICT_MAX,

@@ -1,4 +1,8 @@
 const { processBulkPrediction } = require("../services/bulkPredictService");
+const logger = require("../utils/logger");
+
+const MAX_TEXT_LENGTH = 10000;
+const MIN_TEXT_LENGTH = 2;
 
 /**
  * Extract a usable prediction text value from a CSV row.
@@ -9,7 +13,7 @@ const getPredictionInputFromRow = (row) => {
 
   const rowEntries = Object.entries(row);
   const textEntry = rowEntries.find(([key]) =>
-    ["text", "message"].includes(key.trim().toLowerCase())
+    ["text", "message", "content", "email", "sms", "tweet"].includes(key.trim().toLowerCase())
   );
 
   if (!textEntry) return null;
@@ -35,32 +39,65 @@ const validateBulkPredictionRows = (rows, res) => {
   }
 
   const normalizedRows = [];
+  const errors = [];
 
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
 
     if (!row || typeof row !== "object" || Array.isArray(row)) {
-      res.status(400).json({
-        success: false,
-        error: `Row ${index + 2} is not a valid CSV record.`,
+      errors.push({
+        row: index + 2,
+        error: "Row is not a valid CSV record."
       });
-      return null;
+      continue;
     }
 
     const predictionInput = getPredictionInputFromRow(row);
 
     if (!predictionInput) {
-      res.status(400).json({
-        success: false,
-        error: `Row ${index + 2} is missing valid text content.`,
+      errors.push({
+        row: index + 2,
+        error: "Row is missing valid text content."
       });
-      return null;
+      continue;
+    }
+
+    if (predictionInput.length < MIN_TEXT_LENGTH) {
+      errors.push({
+        row: index + 2,
+        error: `Text content too short. Minimum ${MIN_TEXT_LENGTH} characters required.`
+      });
+      continue;
+    }
+
+    if (predictionInput.length > MAX_TEXT_LENGTH) {
+      errors.push({
+        row: index + 2,
+        error: `Text content too long. Maximum ${MAX_TEXT_LENGTH} characters allowed.`
+      });
+      continue;
     }
 
     normalizedRows.push({
       ...row,
       text: predictionInput,
     });
+  }
+
+  if (errors.length > 0) {
+    const errorSummary = {
+      totalRows: rows.length,
+      validRows: normalizedRows.length,
+      invalidRows: errors.length,
+      errors: errors.slice(0, 10)
+    };
+
+    res.status(400).json({
+      success: false,
+      error: "Row validation failed",
+      details: errorSummary
+    });
+    return null;
   }
 
   return normalizedRows;
@@ -77,22 +114,34 @@ exports.handleBulkPrediction = async (req, res) => {
 
     const { rows, filename, size } = req.parsedFile;
 
-    // Process predictions
-    const results = await processBulkPrediction(rows);
+    logger.info(`Bulk prediction requested: ${filename}, ${rows.length} rows`);
+
+    const validatedRows = validateBulkPredictionRows(rows, res);
+    
+    if (!validatedRows) {
+      return;
+    }
+
+    const results = await processBulkPrediction(validatedRows);
+
+    logger.info(`Bulk prediction completed: ${filename}, ${validatedRows.length} rows processed`);
 
     res.json({
       success: true,
       totalRows: rows.length,
+      validRows: validatedRows.length,
+      invalidRows: rows.length - validatedRows.length,
       filename: filename,
       size: size,
       results: results
     });
   } catch (error) {
     console.error('Bulk prediction error:', error);
+    logger.error('Bulk prediction error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to process bulk prediction',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

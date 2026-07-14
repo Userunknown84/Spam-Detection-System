@@ -67,6 +67,16 @@ def test_non_object_body_rejected(client):
     assert "JSON object" in response.get_json()["error"]
 
 
+@pytest.mark.parametrize("payload", ["[1, 2]", '"hello"', "42", "null"])
+def test_valid_non_object_json_bodies_rejected(client, payload):
+    response = client.post("/predict", data=payload, content_type="application/json")
+    assert response.status_code == 400
+    error = response.get_json()["error"]
+    assert "JSON object" in error
+    # A well-formed body (even `null`) must not be reported as malformed JSON.
+    assert "valid JSON object" not in error
+
+
 def test_valid_message_still_works(client):
     response = client.post(
         "/predict", json={"text": "Win a free prize now!", "type": "message"}
