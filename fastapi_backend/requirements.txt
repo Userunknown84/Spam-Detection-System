@@ -7,3 +7,4 @@ joblib==1.5.1
 python-dotenv==1.1.1
 numpy
 python-multipart
+xgboost

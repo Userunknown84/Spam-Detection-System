@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from backend.xai_service import XAIService
 from backend.config import FRONTEND_URL, BASE_URL, PORT
+from fastapi_backend.pipeline import SpamDetectionPipeline
 
 # ── Configure Logging ──────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +69,24 @@ def heuristic_url_is_malicious(url):
 
 xai_service = XAIService(model=model, vectorizer=vectorizer, label_encoder=label_encoder)
 
+# ── Initialize 5-Step Spam Detection Pipeline ──────────────────────────────────
+# Try to load XGBoost model if available, otherwise pipeline falls back to SVM
+XGBOOST_MODEL_PATH = BASE_DIR / "xgboost_model.pkl"
+xgboost_model = None
+if XGBOOST_MODEL_PATH.exists():
+    try:
+        xgboost_model = joblib.load(XGBOOST_MODEL_PATH)
+        logger.info("XGBoost model loaded for final classification")
+    except Exception as e:
+        logger.warning(f"Failed to load XGBoost model: {e}. Falling back to SVM only.")
+
+spam_detection_pipeline = SpamDetectionPipeline(
+    svm_model=model,
+    tfidf_vectorizer=vectorizer,
+    xgboost_model=xgboost_model,
+    label_encoder=label_encoder
+)
+
 app = FastAPI(title="Spam Detection System")
 
 # ── Share ML objects with routers via app state (Issue #129) ─────────────────
@@ -77,6 +96,7 @@ app = FastAPI(title="Spam Detection System")
 app.state.model = model
 app.state.vectorizer = vectorizer
 app.state.label_encoder = label_encoder
+app.state.pipeline = spam_detection_pipeline
 
 # ── CORS setup ────────────────────────────────────────────────────────────────
 app.add_middleware(
@@ -148,6 +168,31 @@ def predict(body: PredictIn):
             "prediction": label,       # e.g. "ham", "spam", "smishing"
             "confidence": confidence,  # e.g. 1.2345
         }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+# ── Advanced Pipeline Prediction route (5-step architecture) ──────────────────
+@app.post("/predict-pipeline")
+def predict_pipeline(body: PredictIn):
+    """
+    Classify a message using the 5-step Spam Detection Pipeline:
+    
+    Step 1: Raw Input - Accept raw email text
+    Step 2: Text Vectorization - Apply TF-IDF (max_features=2000)
+    Step 3: Parallel Processing - Linear SVM + Metadata Extraction
+    Step 4: Feature Fusion - Combine spam score + metadata
+    Step 5: Final Classification - XGBoost (or SVM fallback)
+    
+    Returns:
+        prediction: Human-readable label ("ham", "spam", "smishing")
+        confidence: Confidence score
+        spam_score: Spam score from parallel SVM classifier
+        metadata: Extracted metadata features
+        fused_features: Combined features used for final classification
+    """
+    try:
+        result = spam_detection_pipeline.process(body.text)
+        return result
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
