@@ -1,3 +1,7 @@
+<<<<<<< Updated upstream
+=======
+#Manipulation
+>>>>>>> Stashed changes
 import React from 'react';
 
 const ManipulationIndex = ({ text, result, darkMode }) => {

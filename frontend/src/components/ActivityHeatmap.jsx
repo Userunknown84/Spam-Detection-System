@@ -1,7 +1,14 @@
+<<<<<<< Updated upstream
 import React, { useState, useEffect } from 'react';
 import api from '../utils/axiosInstance';
 
 const ActivityHeatmap = ({ userId, darkMode }) => {
+=======
+import React, { useState } from 'react';
+// import api from '../api';
+
+const ActivityHeatmap = ({ userId, startDate, endDate }) => {
+>>>>>>> Stashed changes
     const [activityData, setActivityData] = useState([]);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDay, setSelectedDay] = useState(null);

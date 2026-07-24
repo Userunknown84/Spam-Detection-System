@@ -238,6 +238,10 @@ router.post("/predict", predictLimiter, preventCacheStampede, protect, checkCach
  
      // Check ML Cache globally before calling Flask
      const cacheKey = `spam_cache:${require('crypto').createHash('sha256').update(text).digest('hex')}`;
+<<<<<<< Updated upstream
+=======
+     const { redisClient } = require("./middleware/cacheMiddleware");
+>>>>>>> Stashed changes
      if (redisClient && redisClient.status === 'ready') {
        try {
          const cachedResult = await redisClient.get(cacheKey);
@@ -415,6 +419,7 @@ router.post("/feedback", protect, async (req, res) => {
   }
 });
 
+<<<<<<< Updated upstream
 router.get("/feedback/stats", protect, async (req, res) => {
   try {
     const response = await axios.get(`${ML_API_BASE}/feedback/stats`);
@@ -434,6 +439,8 @@ router.get("/feedback/stats", protect, async (req, res) => {
   }
 });
 
+=======
+>>>>>>> Stashed changes
 router.post("/analyze-email-header", protect, upload.single("file"), async (req, res) => {
  try {
        if (req.file) {

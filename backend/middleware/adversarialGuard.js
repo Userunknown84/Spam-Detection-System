@@ -1,6 +1,13 @@
 /**
  * Adversarial Guard - Runtime pattern detection & confidence monitoring
+<<<<<<< Updated upstream
 
+=======
+<<<<<<< HEAD
+=======
+ * Detects potential adversarial attacks in real-time
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
  */
 
 const CONFIDENCE_THRESHOLD = parseFloat(process.env.CONFIDENCE_THRESHOLD) || 0.6;
@@ -38,11 +45,20 @@ const ADVERSARIAL_PATTERNS = {
     }
 };
 
+<<<<<<< Updated upstream
 
 /**
  * Detect adversarial patterns in text
  */
 
+=======
+<<<<<<< HEAD
+=======
+/**
+ * Detect adversarial patterns in text
+ */
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
 function detectAdversarialPatterns(text) {
     if (!text) return { isSuspicious: false, score: 0, patterns: [] };
 
@@ -61,14 +77,23 @@ function detectAdversarialPatterns(text) {
         }
     }
 
+<<<<<<< HEAD
     const normalizedScore = Math.min(score, 1.0);
     
+<<<<<<< Updated upstream
 
+=======
+=======
+>>>>>>> Stashed changes
     // Normalize score
     const normalizedScore = Math.min(score, 1.0);
     
     // Check for extremely long text (potential DoS)
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
     if (text.length > 10000) {
         return {
             isSuspicious: true,
@@ -86,9 +111,14 @@ function detectAdversarialPatterns(text) {
     };
 }
 
+<<<<<<< HEAD
 function adversarialGuard(req, res, next) {
     const text = req.body?.text || req.query?.text || '';
     
+<<<<<<< Updated upstream
+=======
+=======
+>>>>>>> Stashed changes
 /**
  * Middleware to check for adversarial patterns
  */
@@ -96,22 +126,35 @@ function adversarialGuard(req, res, next) {
     const text = req.body?.text || req.query?.text || '';
     
     // Skip if no text
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
     if (!text) {
         req.adversarialAnalysis = { isSuspicious: false, score: 0, patterns: [] };
         return next();
     }
 
+<<<<<<< HEAD
     const analysis = detectAdversarialPatterns(text);
     req.adversarialAnalysis = analysis;
 
+<<<<<<< Updated upstream
 
+=======
+=======
+>>>>>>> Stashed changes
     // Check for adversarial patterns
     const analysis = detectAdversarialPatterns(text);
     req.adversarialAnalysis = analysis;
 
     // Log suspicious activity
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
     if (analysis.isSuspicious) {
         console.log(`⚠️ [ADVERSARIAL GUARD] Suspicious pattern detected:`, {
             score: analysis.score,
@@ -125,19 +168,35 @@ function adversarialGuard(req, res, next) {
     next();
 }
 
+<<<<<<< Updated upstream
 
 /**
  * Middleware to monitor prediction confidence
  */
 
+=======
+<<<<<<< HEAD
+=======
+/**
+ * Middleware to monitor prediction confidence
+ */
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
 function monitorConfidence(req, res, next) {
     const originalSend = res.send;
     
     res.send = function(data) {
         try {
+<<<<<<< Updated upstream
 
             // Parse the response
 
+=======
+<<<<<<< HEAD
+=======
+            // Parse the response
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
             let responseData;
             if (typeof data === 'string') {
                 responseData = JSON.parse(data);
@@ -145,16 +204,25 @@ function monitorConfidence(req, res, next) {
                 responseData = data;
             }
 
+<<<<<<< HEAD
             if (responseData && typeof responseData === 'object') {
                 const confidence = responseData.confidence_score || responseData.confidence || 0;
                 
+<<<<<<< Updated upstream
 
+=======
+=======
+>>>>>>> Stashed changes
             // Check if it's a prediction response
             if (responseData && typeof responseData === 'object') {
                 const confidence = responseData.confidence_score || responseData.confidence || 0;
                 
                 // Add adversarial analysis
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
                 if (req.adversarialAnalysis) {
                     responseData.adversarial_analysis = {
                         is_suspicious: req.adversarialAnalysis.isSuspicious,
@@ -163,9 +231,16 @@ function monitorConfidence(req, res, next) {
                     };
                 }
 
+<<<<<<< Updated upstream
 
                 // Flag low confidence
 
+=======
+<<<<<<< HEAD
+=======
+                // Flag low confidence
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
                 if (FLAG_LOW_CONFIDENCE && confidence < CONFIDENCE_THRESHOLD) {
                     responseData.low_confidence = true;
                     responseData.needs_review = true;
@@ -173,32 +248,57 @@ function monitorConfidence(req, res, next) {
                     console.log(`⚠️ [CONFIDENCE MONITOR] Low confidence prediction:`, {
                         confidence,
                         threshold: CONFIDENCE_THRESHOLD,
+<<<<<<< HEAD
                         prediction: responseData.result || responseData.prediction
                     });
                 }
 
+<<<<<<< Updated upstream
 
+=======
+=======
+>>>>>>> Stashed changes
                         prediction: responseData.result || responseData.prediction,
                         textPreview: req.body?.text?.substring(0, 100)
                     });
                 }
 
                 // If suspicious AND low confidence, flag for immediate review
+<<<<<<< Updated upstream
+=======
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
                 if (req.adversarialAnalysis?.isSuspicious && confidence < CONFIDENCE_THRESHOLD) {
                     responseData.requires_immediate_review = true;
                     responseData.review_reason = 'Adversarial pattern detected with low confidence';
                 }
 
+<<<<<<< Updated upstream
                 // Return modified response
 
+=======
+<<<<<<< HEAD
+=======
+                // Return modified response
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
                 const jsonData = JSON.stringify(responseData);
                 originalSend.call(this, jsonData);
                 return;
             }
+<<<<<<< HEAD
         } catch (e) {}
+<<<<<<< Updated upstream
         } catch (e) {
             // If parsing fails, just pass through
         }
+=======
+=======
+        } catch (e) {
+            // If parsing fails, just pass through
+        }
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
         
         originalSend.call(this, data);
     };

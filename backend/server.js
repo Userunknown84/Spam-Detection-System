@@ -22,15 +22,30 @@ const compression = require('compression');
 const { v4: uuidv4 } = require('uuid');
 const helmet = require('helmet');
 const axios = require("axios");
+
 const { corsOptions } = require('./config/corsConfig');
+
 
 // Initialize background jobs
 require('./jobs/archivalCron');
 require('./jobs/webhookRetryCron');
 const { preventCacheStampede } = require('./middleware/cacheMiddleware');
+
 const adversarialRoutes = require('./routes/adversarialRoutes');
 const evoMailRoutes = require('./routes/evoMailRoutes');
 const poisoningRoutes = require('./routes/poisoningRoutes');
+app.use('/api/poisoning', poisoningRoutes);
+
+// Add VBSF routes
+const visualRoutes = require('./routes/visualRoutes');
+app.use('/api/visual', visualRoutes);
+const logStartupTime= (component, startTime) => {
+
+
+// Add EvoMail routes
+const evoMailRoutes = require('./routes/evoMailRoutes');
+app.use('/api/evomail', evoMailRoutes);
+
 
 const healthRoutes = require("./routes/healthRoutes");
 const predictionRoutes = require("./routes/predictionRoutes");
@@ -45,6 +60,7 @@ const startupLogs = [];
 const { configureAxios } = require('./config/axios');
 configureAxios(); // Apply the global axios configuration
 const logStartupTime = (component, startTime) => {
+
   const elapsed = Date.now() - startTime;
   startupLogs.push({ component, elapsed });
   logger.info(`⏱️ ${component} loaded in ${elapsed}ms`);
@@ -195,11 +211,13 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use('/uploads', express.static('uploads'));
 
+
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   explorer: true,
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'Spam Detection API Docs'
 }));
+
 
 // ===== REQUEST ID MIDDLEWARE =====
 app.use((req, res, next) => {
@@ -294,10 +312,12 @@ app.get("/", (req, res) => {
   res.send("Node backend running ");
 });
 
+
 app.get('/api-docs.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
+
 
 // ========================================
 // START SERVER

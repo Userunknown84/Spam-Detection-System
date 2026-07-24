@@ -9,7 +9,11 @@ const validateEnv= () => {
     const invalid = [];
 
     for(const envVar of REQUIRED_ENV_VARS){
+<<<<<<< Updated upstream
         if(!process.env[envVar] || process.env[envVar].trim() === ''){
+=======
+        if(!process.env[envVar]){
+>>>>>>> Stashed changes
             missing.push(envVar);
         }
     }

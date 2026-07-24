@@ -30,14 +30,17 @@ nltk
 # Email authenticity verification module uses standard libraries (email, re)
 # IMAP inbox scanning (issue #186) uses the standard library imaplib/email modules
 
+
 beautifulsoup4>=4.12.0
 pytesseract>=0.3.10
 opencv-python>=4.8.0
 Pillow>=9.0.0
 html2image>=2.0.0
+
 scikit-learn>=1.2.0
 pandas>=1.5.0
 numpy>=1.23.0
+
 
 
 scikit-learn>=1.2.0

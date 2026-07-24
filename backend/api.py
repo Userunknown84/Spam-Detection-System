@@ -60,6 +60,8 @@ except ImportError:
 
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "email_connectors"))
+
 
 load_dotenv()
 
@@ -142,6 +144,7 @@ def validate_internal_request(f):
 # Alias used by routes that gate on the internal service-to-service secret.
 internal_endpoint_required = validate_internal_request
 
+
 # Apply to all routes by default (except public paths)
 @app.before_request
 def require_internal_secret():
@@ -174,7 +177,11 @@ def ip_allowlist(f):
         allowed_ips = os.getenv("SERVICE_IP_ALLOWLIST", "127.0.0.1,::1")
         allowed_list = [ip.strip() for ip in allowed_ips.split(",")]
         
+
         client_ip = request.headers.get("X-Forwarded-For", request.remote_addr) or ""
+
+        client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+
         # Get first IP if multiple
         if "," in client_ip:
             client_ip = client_ip.split(",")[0].strip()
@@ -229,6 +236,8 @@ def validate_request(f):
     return decorated_function
 
 
+
+# ============================================
 
 # ZERO TRUST - AUDIT LOGGING
 # ============================================
@@ -309,14 +318,28 @@ xai_service = XAIService(model=model, vectorizer=vectorizer, label_encoder=label
 
 
 
+# In-memory storage for spam words
+spam_words_storage = {}
+
+
 # SQLite Persistent Storage for spam words
 import sqlite3
 from datetime import datetime, timezone
 
 
 
+
 def init_spam_words_db():
     with imap_store.get_db_connection() as conn:
+
+def _db_connection():
+    conn = sqlite3.connect(imap_store.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_spam_words_db():
+    with _db_connection() as conn:
+
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS spam_word_frequencies (
@@ -331,7 +354,11 @@ def init_spam_words_db():
 
 def increment_spam_word_frequency(word):
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
     with imap_store.get_db_connection() as conn:
+
+    with _db_connection() as conn:
+
         conn.execute(
             """
             INSERT INTO spam_word_frequencies (word, day, count)
@@ -344,6 +371,9 @@ def increment_spam_word_frequency(word):
 
 def get_db_wordcloud_data():
     with imap_store.get_db_connection() as conn:
+
+    with _db_connection() as conn:
+
         rows = conn.execute(
             """
             SELECT word, SUM(count) as total_count
@@ -401,7 +431,11 @@ SPAM_WORD_METADATA = {
 def get_word_of_the_day_data():
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     word_row = None
+
     with imap_store.get_db_connection() as conn:
+
+    with _db_connection() as conn:
+
         word_row = conn.execute(
             """
             SELECT word, SUM(count) as total_count
@@ -424,7 +458,7 @@ def get_word_of_the_day_data():
                 LIMIT 1
                 """
             ).fetchone()
-    
+
     if word_row:
         word = word_row["word"]
         count = word_row["total_count"]
@@ -451,12 +485,18 @@ app.model = model  # type: ignore[attr-defined]
 app.vectorizer = vectorizer  # type: ignore[attr-defined]
 app.label_encoder = label_encoder  # type: ignore[attr-defined]
 
+app.model = model
+app.vectorizer = vectorizer
+app.label_encoder = label_encoder
+
+
 from bulk_predict import bulk_predict_bp
 app.register_blueprint(bulk_predict_bp)
 app.register_blueprint(analytics_bp)
 
 url_model = joblib.load(URL_MODEL_PATH)
 url_vectorizer = joblib.load(URL_VECTORIZER_PATH)
+
 URL_LABELS = {0: "malicious", 1: "safe"}
 # url_detector.pkl predicts numeric classes with no bundled label encoder
 URL_LABELS = {0: "safe", 1: "malicious"}
@@ -570,6 +610,9 @@ def make_prediction_response(
     domain_analysis=None,
     explanation=None,
     severity=None
+
+    explanation=None
+
 ):
     """Enforces a strict standardized response schema for all predictions."""
     response = {
@@ -587,6 +630,7 @@ def make_prediction_response(
         response["translated_text"] = translated_text
     if domain_analysis is not None:
         response["domain_analysis"] = domain_analysis
+
         # Thin, top-level summary of domain_analysis for consumers that just
         # want a quick URL risk signal without parsing the full breakdown.
         response["url_risk"] = {
@@ -598,6 +642,10 @@ def make_prediction_response(
         response["explanation"] = explanation
     if severity is not None:
         response["severity"] = severity
+
+    if explanation is not None:
+        response["explanation"] = explanation
+
     return response
 
 
@@ -613,6 +661,7 @@ def predict():
 
 
     try:
+
         data = request.get_json(silent=True)
         if data is None:
             raw_body = request.get_data(cache=True)
@@ -635,6 +684,9 @@ def predict():
                 "error": f"Request body must be a JSON object, got {type(data).__name__}"
             }), 400
 
+
+        data = request.get_json(silent=True) or {}
+
         text = data.get("text")
         input_type = data.get("type", "message")
 
@@ -647,7 +699,20 @@ def predict():
             return jsonify({
                 "error": f"'text' must be a string, got {type(text).__name__}"
             }), 400
+
+        normalized_text = normalizer.normalize(text)
+        vectorized = vectorizer.transform([normalized_text])
+        prediction = model.predict(vectorized)[0]
+    
+        return jsonify({
+          'original_text': text,
+          'normalized_text': normalized_text,
+          'prediction': prediction
+        })
+
+
         # Maximum-length validation before any vectorization/inference work.
+
         if len(text) > MAX_MESSAGE_LENGTH:
             return jsonify({
                 "error": (
@@ -722,7 +787,11 @@ def predict():
         else:
             confidence_level = "low"
 
+
         if final_output != "ham":
+
+        if final_output == "spam":
+
             words = extract_words(text)
             for word in words:
                 try:
@@ -739,6 +808,7 @@ def predict():
         
         explanation = xai_engine.analyze(text, input_type=input_type)
         severity = calculate_spam_severity(original_text)
+
 
         response_data = {
             "input": original_text,
@@ -767,8 +837,11 @@ def predict():
             translated=translated,
             translated_text=text if translated else None,
             domain_analysis=domain_analysis,
+
             explanation=explanation,
             severity=severity
+            explanation=explanation
+
         )
 
 
@@ -799,6 +872,26 @@ def extract_words(text):
 
 
 def get_wordcloud_data():
+
+    """Return stored spam word frequencies from database."""
+    try:
+        data = get_db_wordcloud_data()
+        return data if data else None
+    except Exception as e:
+        print(f"[db-wordcloud] failed to get wordcloud data: {e}")
+        return None
+
+
+
+   if spam_words_storage:
+
+    if spam_words_storage:
+
+        sorted_words = sorted(spam_words_storage.items(), key=lambda x: x[1], reverse=True)
+        return [{"word": w, "count": c} for w, c in sorted_words[:50]]
+    return None
+
+
     """Return stored spam word frequencies from database."""
     try:
         data = get_db_wordcloud_data()
@@ -897,6 +990,7 @@ def feedback():
         return jsonify({"error": "Failed to record feedback."}), 500
 
 
+
 @app.route("/feedback/stats", methods=["GET"])
 @validate_request
 @validate_internal_request
@@ -961,6 +1055,7 @@ def feedback_stats():
         "by_predicted_label": by_predicted_label,
         "recent": recent,
     })
+
 
 
 # ============================================
@@ -1199,9 +1294,68 @@ def scan_emails_route():
 
 imap_store.init_db()
 oauth_store.init_db()
+
 init_spam_words_db()
+
 scheduler = BackgroundScheduler()
 scheduler.start()
+
+def _refresh_oauth_tokens():
+    """Runs inside the scheduler thread: refreshes OAuth tokens close to expiration."""
+    try:
+        expiring = oauth_store.get_expiring_oauth_tokens(threshold_minutes=10)
+    except Exception as e:
+        print(f"[oauth-refresh] failed to fetch expiring tokens: {e}")
+        return
+
+    for token_entry in expiring:
+        username = token_entry["username"]
+        provider = token_entry["provider"]
+        refresh_token = token_entry["refresh_token"]
+
+        if not refresh_token:
+            print(f"[oauth-refresh] No refresh token for {username} ({provider})")
+            continue
+
+        try:
+            if provider == "gmail":
+                new_tokens = refresh_gmail_token(refresh_token)
+            elif provider == "outlook":
+                new_tokens = refresh_outlook_token(refresh_token)
+            else:
+                continue
+
+            oauth_store.save_oauth_tokens(username, provider, new_tokens)
+            print(f"[oauth-refresh] successfully refreshed token for {username} ({provider})")
+        except requests.exceptions.HTTPError as err:
+            is_auth_error = False
+            try:
+                if err.response is not None:
+                    if err.response.status_code in (400, 401):
+                        err_json = err.response.json()
+                        err_desc = err_json.get("error", "")
+                        if "invalid_grant" in err_desc or err_json.get("error_description", ""):
+                            is_auth_error = True
+            except Exception:
+                pass
+
+            if is_auth_error or (err.response is not None and err.response.status_code == 400):
+                print(f"[oauth-refresh] Token revoked/invalid for {username} ({provider}). Deleting from DB.")
+                oauth_store.delete_oauth_tokens(username, provider)
+            else:
+                print(f"[oauth-refresh] Temporary HTTP error refreshing token for {username} ({provider}): {err}")
+        except Exception as e:
+            print(f"[oauth-refresh] failed to refresh token for {username} ({provider}): {e}")
+
+
+scheduler.add_job(
+    _refresh_oauth_tokens,
+    "interval",
+    minutes=5,
+    id="oauth_token_refresh",
+    replace_existing=True,
+)
+
 
 def _refresh_oauth_tokens():
     """Runs inside the scheduler thread: refreshes OAuth tokens close to expiration."""

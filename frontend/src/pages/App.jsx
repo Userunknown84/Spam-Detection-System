@@ -22,6 +22,7 @@ import 'react-loading-skeleton/dist/skeleton.css';
 import EmailHeaderAnalyzer from "../components/EmailHeaderAnalyzer";
 import BulkSpamDetection from "../components/BulkSpamDetection";
 import { ResultBadge } from '../components/ResultBadge';
+import { ResultBadge } from './components/ResultBadge';
 import SpamInsightsDashboard from "../components/SpamInsightsDashboard";
 import EmailScannerDashboard from "../components/EmailScannerDashboard";
 import Chatbot from "../components/Chatbot";
@@ -59,7 +60,9 @@ function App() {
   const [lastCall, setLastCall] = useState(0);
   const [rateLimitError, setRateLimitError] = useState('');
   const [copied, setCopied] = useState(false);
+
   // eslint-disable-next-line no-unused-vars
+
   const [showPatternLibrary, setShowPatternLibrary] = useState(false);
   const [hasCelebrated, setHasCelebrated] = useState(() => {
     return localStorage.getItem("firstPrediction") === "true";
@@ -119,21 +122,21 @@ function App() {
   };
 
   // Helper to get earned badges (returns array of badge objects)
-  // eslint-disable-next-line no-unused-vars
+
   const getEarnedBadges = () => {
     try {
       const streakCount = parseInt(localStorage.getItem('predictionStreak') || '0', 10);
       return Object.keys(Badges)
         .map((k) => ({ day: Number(k), ...Badges[k] }))
         .filter((b) => streakCount >= b.day);
-  // eslint-disable-next-line no-unused-vars
+
     } catch (e) {
       return [];
     }
   };
 
   // Placeholder for badge checking logic
-  // eslint-disable-next-line no-unused-vars
+
   const checkNewBadge = (newStreak) => {
     // simple implementation: if new streak matches a badge threshold, show popup
     if (Badges[newStreak]) {
@@ -387,6 +390,7 @@ const analyzeEmojiSentiment = (text) => {
       setSeverity(res.data.severity || null);
       setExplanation(res.data.explanation || null);
       setUrlRisk(res.data.url_risk || null);
+      setExplanation(res.data.explanation || null);
       setErrorInfo(null);
     } catch (error) {
       console.error('API Error:', error);
@@ -1110,7 +1114,9 @@ const analyzeEmojiSentiment = (text) => {
                       setHistoryId(null);
                       setConfidence(null);
                       setExplanation(null);
+
                       setUrlRisk(null);
+
                       setErrorInfo(null);
                       setCopied(false);
                       setType("message");
@@ -1136,6 +1142,29 @@ const analyzeEmojiSentiment = (text) => {
 
                 <FeatureImportance darkMode={isDark} />
                 <CensorshipMode text={text} darkMode={isDark} />
+
+
+                  {wordOfDay && (
+  <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-slate-800/30 border-slate-700' : 'bg-white/40 border-slate-200'}`}>
+    <div className="flex items-center justify-between mb-2">
+      <h3 className="text-sm font-semibold opacity-70">📚 Spam Word of the Day</h3>
+      <button onClick={fetchWordOfTheDay} className="text-xs opacity-50 hover:opacity-100 transition-opacity" title="Refresh word of the day">
+        
+      </button>
+    </div>
+    {wordLoading ? (
+      <div className="h-8 w-48 bg-slate-300 rounded animate-pulse"></div>
+    ) : (
+      <>
+        <div className="flex items-center gap-3">
+          <span className={`text-2xl font-bold ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
+            {wordOfDay.word || 'No spam detected today'}
+          </span>
+          {wordOfDay.count && (
+            <span className="text-sm opacity-60">
+              {wordOfDay.count} {wordOfDay.count === 1 ? 'detection' : 'detections'}
+            </span>
+          )}
 
                 {/* SPAM WORD OF THE DAY */}
                 {wordOfDay && (
@@ -1192,7 +1221,9 @@ const analyzeEmojiSentiment = (text) => {
                   </div>
                 </div>
 
+
                 <Route path="/settings" element={<Settings />} />
+
 
                 <WordCloud darkMode={isDark} />
               </>
@@ -1249,6 +1280,23 @@ const analyzeEmojiSentiment = (text) => {
                 </div>
               </div>
             )}
+
+          </div>
+
+        </div>
+        {wordOfDay.definition && (
+          <p className="text-sm mt-2 opacity-75 leading-relaxed">{wordOfDay.definition}</p>
+        )}
+        {wordOfDay.context && (
+          <div className={`mt-2 p-2 rounded text-xs ${isDark ? 'bg-slate-900/50' : 'bg-slate-100/50'}`}>
+            <span className="opacity-60">Example: </span>
+            <span className="italic">"{wordOfDay.context}"</span>
+          </div>
+        )}
+        {wordOfDay.tips && (
+          <div className={`mt-2 p-2 rounded text-xs ${isDark ? 'bg-blue-900/20' : 'bg-blue-50'}`}>
+             {wordOfDay.tips}
+
           </div>
         )}
       </>

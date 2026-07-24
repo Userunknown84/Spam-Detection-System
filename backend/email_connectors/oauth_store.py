@@ -3,12 +3,20 @@ import sqlite3
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+<<<<<<< Updated upstream
 from imap_store import DB_PATH, get_db_connection
+=======
+from imap_store import DB_PATH, _connection
+>>>>>>> Stashed changes
 from crypto_utils import encrypt_secret, decrypt_secret
 
 
 def init_db():
+<<<<<<< Updated upstream
     with get_db_connection() as conn:
+=======
+    with _connection() as conn:
+>>>>>>> Stashed changes
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS oauth_tokens (
@@ -46,7 +54,11 @@ def save_oauth_tokens(username, provider, tokens):
     expires_at = (now + timedelta(seconds=int(expires_in))).isoformat()
     updated_at = now.isoformat()
 
+<<<<<<< Updated upstream
     with get_db_connection() as conn:
+=======
+    with _connection() as conn:
+>>>>>>> Stashed changes
         conn.execute(
             """
             INSERT INTO oauth_tokens (username, provider, encrypted_access_token, encrypted_refresh_token, expires_at, updated_at)
@@ -63,7 +75,11 @@ def save_oauth_tokens(username, provider, tokens):
 
 
 def get_oauth_tokens(username, provider):
+<<<<<<< Updated upstream
     with get_db_connection() as conn:
+=======
+    with _connection() as conn:
+>>>>>>> Stashed changes
         row = conn.execute(
             "SELECT * FROM oauth_tokens WHERE username = ? AND provider = ?",
             (username, provider),
@@ -91,7 +107,11 @@ def get_oauth_tokens(username, provider):
 
 
 def delete_oauth_tokens(username, provider=None):
+<<<<<<< Updated upstream
     with get_db_connection() as conn:
+=======
+    with _connection() as conn:
+>>>>>>> Stashed changes
         if provider:
             conn.execute(
                 "DELETE FROM oauth_tokens WHERE username = ? AND provider = ?",
@@ -106,7 +126,11 @@ def delete_oauth_tokens(username, provider=None):
 
 
 def get_all_oauth_tokens():
+<<<<<<< Updated upstream
     with get_db_connection() as conn:
+=======
+    with _connection() as conn:
+>>>>>>> Stashed changes
         rows = conn.execute("SELECT * FROM oauth_tokens").fetchall()
         tokens_list = []
         for row in rows:
@@ -133,7 +157,11 @@ def get_all_oauth_tokens():
 def get_expiring_oauth_tokens(threshold_minutes=10):
     now = datetime.now(timezone.utc)
     threshold = (now + timedelta(minutes=threshold_minutes)).isoformat()
+<<<<<<< Updated upstream
     with get_db_connection() as conn:
+=======
+    with _connection() as conn:
+>>>>>>> Stashed changes
         rows = conn.execute(
             "SELECT * FROM oauth_tokens WHERE expires_at <= ?",
             (threshold,),
