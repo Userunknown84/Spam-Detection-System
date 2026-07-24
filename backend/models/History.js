@@ -23,20 +23,29 @@ const historySchema = new mongoose.Schema(
     prediction: {
       type: String,
       required: [true, "Prediction is required."],
+<<<<<<< Updated upstream
       enum: {
         values: ["ham", "spam"],
         message: "Prediction must be either 'ham' or 'spam'"
       },
       default: "ham"
+=======
+>>>>>>> Stashed changes
     },
     type: {
       type: String,
       required: [true, "Type is required."],
       enum: {
+<<<<<<< Updated upstream
         values: PREDICTION_TYPE_LIST,
         message: `Type must be one of: ${PREDICTION_TYPE_LIST.join(', ')}`,
       },
       default: PREDICTION_TYPES.MESSAGE
+=======
+        values: ["sms", "email", "url", "message"],
+        message: "Type must be one of: sms, email, url, or message.",
+      },
+>>>>>>> Stashed changes
     },
     confidence: {
       type: Number,
@@ -81,6 +90,11 @@ const historySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+<<<<<<< Updated upstream
+=======
+// 1. Time-Series Index: Optimizes getTrends (filtering by user & sorting by date)
+// Drastically improves performance for dashboard time-series charts.
+>>>>>>> Stashed changes
 historySchema.index({ user: 1, createdAt: -1 }, { background: true });
 historySchema.index({ user: 1, prediction: 1 }, { background: true });
 historySchema.index({ user: 1, type: 1 }, { background: true });

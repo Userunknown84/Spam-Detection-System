@@ -1,15 +1,7 @@
 const multer = require('multer');
 const net = require('net');
 
-<<<<<<< Updated upstream
-/**
- * Parses a single CSV line handling quoted fields and escaped quotes according to RFC 4180.
- * @param {string} line 
- * @returns {string[]}
- */
-=======
 
->>>>>>> Stashed changes
 function parseCSVLine(line) {
     const result = [];
     let current = '';
@@ -63,8 +55,6 @@ function sanitizeCSVCell(value) {
     // Neutralize formula injection: if starts with =, +, -, @, prefix with '
     if (/^[=\+\-@]/.test(sanitized)) {
         sanitized = "'" + sanitized;
-<<<<<<< Updated upstream
-=======
 function sanitizeCSVCell(cell) {
     if (!cell || typeof cell !== 'string') {
         return cell;
@@ -120,7 +110,6 @@ function sanitizeCSVCell(cell) {
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#x27;');
         }
->>>>>>> Stashed changes
     }
     
     return sanitized;
@@ -166,8 +155,6 @@ async function scanWithClamAV(buffer) {
                 resolve(false); // Malware found
             } else {
                 resolve(true); // Clean
-<<<<<<< Updated upstream
-=======
 function validateCSVContent(rows, headers) {
     const errors = [];
 
@@ -207,7 +194,6 @@ function validateCSVContent(rows, headers) {
         Object.values(row).forEach(value => {
             if (value && value.length > maxCellLength) {
                 errors.push(`Row ${index + 1} contains a cell exceeding ${maxCellLength} characters`);
->>>>>>> Stashed changes
             }
         });
         
@@ -248,8 +234,6 @@ const validateCSVUpload = (req, res, next) => {
                 return res.status(413).json({ error: 'File too large' });
             }
             return res.status(400).json({ error: err.message });
-<<<<<<< Updated upstream
-=======
 async function scanForMalware(fileBuffer, filename) {
     try {
         // Check if ClamAV is available
@@ -268,7 +252,6 @@ async function scanForMalware(fileBuffer, filename) {
         if (error.code === 'ECONNREFUSED') {
             console.warn('⚠️  ClamAV not available - skipping malware scan');
             return { clean: true, warning: 'ClamAV not available' };
->>>>>>> Stashed changes
         }
 
         if (!req.file) {
@@ -280,8 +263,6 @@ async function scanForMalware(fileBuffer, filename) {
         if (req.file.size > maxFileSize) {
             return res.status(413).json({ error: 'File too large' });
         }
-<<<<<<< Updated upstream
-=======
 const validateCSVUpload = async (req, res, next) => {
     try {
         // Use multer to handle file upload
@@ -310,7 +291,6 @@ const validateCSVUpload = async (req, res, next) => {
                     error: err.message
                 });
             }
->>>>>>> Stashed changes
 
         const buffer = req.file.buffer;
 
@@ -320,8 +300,6 @@ const validateCSVUpload = async (req, res, next) => {
                 const isClean = await scanWithClamAV(buffer);
                 if (!isClean) {
                     return res.status(400).json({ error: 'File contains malware' });
-<<<<<<< Updated upstream
-=======
                 // 1. Validate file type (already done by multer)
                 const fileExt = path.extname(req.file.originalname).toLowerCase();
                 if (!ALLOWED_EXTENSIONS.includes(fileExt) &&
@@ -389,7 +367,6 @@ const validateCSVUpload = async (req, res, next) => {
                         success: false,
                         errors: validationResults
                     });
->>>>>>> Stashed changes
                 }
             } catch (scanError) {
                 console.error('Malware scan failed:', scanError);
@@ -440,10 +417,6 @@ const validateCSVUpload = async (req, res, next) => {
             // Yield to the event loop every 500 rows to prevent blocking (DoS)
             if (i % 500 === 0) {
                 await new Promise(resolve => setImmediate(resolve));
-<<<<<<< Updated upstream
-            }
-        }
-=======
 /**
  * Parse CSV line handling quoted fields
  */
@@ -469,7 +442,6 @@ function parseCSVLine(line) {
     values.push(current.trim());
     return values;
 }
->>>>>>> Stashed changes
 
         req.parsedCSV = {
             headers: rawHeaders.map(h => h.trim()),

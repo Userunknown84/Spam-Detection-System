@@ -30,6 +30,7 @@ router.delete("/:id", deleteHistoryItem);
 router.delete("/", clearHistory);
 
 router.get('/count', getHistoryCount);
+
 module.exports = router;
 
 router.get('/recent',protect, async(req,res)=> {
@@ -44,6 +45,9 @@ router.get('/recent',protect, async(req,res)=> {
     res.status(500).json({ error: 'Failed to fetch recent activity' });
   }
     });
+
+module.exports = router;
+
 
 router.get('/',protect,async(req,res) => {
   try{
@@ -66,3 +70,4 @@ router.get('/',protect,async(req,res) => {
     res.status(500).json({ error: 'Failed to fetch history' });
   }
 });
+

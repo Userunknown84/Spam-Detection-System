@@ -72,6 +72,16 @@ class AdversarialAugmentor:
         
         # Noise patterns
         self.noise_chars = ['.', '!', '?', ',', ';', ':', ' ']
+<<<<<<< HEAD
+=======
+        
+        # Spam trigger patterns
+        self.spam_triggers = [
+            'urgent', 'free', 'claim', 'prize', 'winner', 'congratulations',
+            'limited time', 'act now', 'exclusive', 'guaranteed', 'money back',
+            'cash', 'bonus', 'credit', 'loan', 'investment', 'profit'
+        ]
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
 
         
         # Spam trigger patterns
@@ -97,9 +107,16 @@ class AdversarialAugmentor:
             word_lower = word.lower().strip('.,!?')
             if word_lower in self.synonyms and random.random() < intensity:
                 new_word = random.choice(self.synonyms[word_lower])
+<<<<<<< Updated upstream
 
                 # Preserve punctuation
 
+=======
+<<<<<<< HEAD
+=======
+                # Preserve punctuation
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
                 punct = word[-1] if word[-1] in '.,!?' else ''
                 result.append(new_word + punct)
             else:
@@ -118,12 +135,17 @@ class AdversarialAugmentor:
             result.insert(pos, char)
         return ''.join(result)
 
+<<<<<<< HEAD
     def generate_variants(self, text, num_variants=5):
         """Generate multiple adversarial variants"""
         variants = []
         for _ in range(num_variants):
             variant = text
+<<<<<<< Updated upstream
 
+=======
+=======
+>>>>>>> Stashed changes
     def sentence_rephrasing(self, text):
         """Simple sentence rephrasing (rule-based)"""
         # This is a simple version - can be enhanced with LLM
@@ -146,6 +168,10 @@ class AdversarialAugmentor:
         for _ in range(num_variants):
             variant = text
             # Apply random transformations
+<<<<<<< Updated upstream
+=======
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
             transformations = random.sample([
                 ('char', 0.2 + random.random() * 0.3),
                 ('synonym', 0.2 + random.random() * 0.3),
@@ -160,12 +186,21 @@ class AdversarialAugmentor:
                 elif transform_type == 'noise':
                     variant = self.noise_injection(variant, intensity)
             
+<<<<<<< Updated upstream
 
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> Stashed changes
             # Sometimes rephrase
             if random.random() < 0.3:
                 variant = self.sentence_rephrasing(variant)
             
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
             variants.append(variant)
         
         return variants
@@ -176,6 +211,7 @@ class AdversarialAugmentor:
 # ============================================
 
 def load_datasets():
+<<<<<<< HEAD
     """Load dataset"""
     if not os.path.exists(DATASET_PATH):
         print(f"❌ Dataset not found at {DATASET_PATH}")
@@ -207,7 +243,11 @@ def create_sample_dataset():
     ]
     df = pd.DataFrame(samples, columns=['text', 'label'])
     print(f"✅ Created sample dataset with {len(df)} samples")
+<<<<<<< Updated upstream
 
+=======
+=======
+>>>>>>> Stashed changes
     """Load and combine email + SMS datasets"""
     data = []
     
@@ -272,7 +312,11 @@ def create_sample_dataset():
     print(f"   Spam: {len(df[df['label']=='spam'])}")
     print(f"   Ham: {len(df[df['label']=='ham'])}")
     
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
     return df
 
 
@@ -284,7 +328,14 @@ def train_adversarial_model(df):
     """Train model with adversarial examples"""
     
     print("\n🔄 Generating adversarial examples...")
+<<<<<<< Updated upstream
 
+=======
+<<<<<<< HEAD
+=======
+    
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
     augmentor = AdversarialAugmentor()
     
     # Separate spam and ham
@@ -336,7 +387,14 @@ def train_adversarial_model(df):
         ('lr', LogisticRegression(class_weight='balanced', max_iter=1000, random_state=42))
     ]
     
+<<<<<<< Updated upstream
 
+=======
+<<<<<<< HEAD
+=======
+    # Train each model
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
     trained_models = {}
     for name, model in models:
         print(f"   Training {name}...")
@@ -367,17 +425,31 @@ def train_adversarial_model(df):
 
 def main():
     print("=" * 60)
+<<<<<<< HEAD
     print("🛡️ Adversarial Training for Spam Detection")
+<<<<<<< Updated upstream
 
     print("🚀 Adversarial Training for Spam Detection")
+=======
+=======
+    print("🚀 Adversarial Training for Spam Detection")
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
     print("=" * 60)
     
     # Load datasets
     df = load_datasets()
     if df is None:
+<<<<<<< HEAD
         print("\n❌ No dataset available")
+<<<<<<< Updated upstream
 
         print("\n❌ Please ensure dataset.csv exists in backend/")
+=======
+=======
+        print("\n❌ Please ensure dataset.csv exists in backend/")
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
         return
     
     # Train model
@@ -390,24 +462,42 @@ def main():
     print(f"💾 Saving vectorizer to {VECTORIZER_OUTPUT_PATH}")
     pickle.dump(vectorizer, open(VECTORIZER_OUTPUT_PATH, 'wb'))
     
+<<<<<<< Updated upstream
 
     # Save label encoder (for compatibility)
 
+=======
+<<<<<<< HEAD
+    # Save label encoder
+=======
+    # Save label encoder (for compatibility)
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
     from sklearn.preprocessing import LabelEncoder
     le = LabelEncoder()
     le.fit(['ham', 'spam'])
     pickle.dump(le, open(LABEL_ENCODER_PATH, 'wb'))
     
+<<<<<<< HEAD
     print("\n✅ Adversarial training complete!")
+<<<<<<< Updated upstream
     print("\n✅ Training complete!")
 
+=======
+=======
+    print("\n✅ Training complete!")
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
+>>>>>>> Stashed changes
     print(f"   Model saved: {MODEL_OUTPUT_PATH}")
     print(f"   Vectorizer saved: {VECTORIZER_OUTPUT_PATH}")
     print("\n📝 To use the robust model, update your .env:")
     print(f"   MODEL_PATH={MODEL_OUTPUT_PATH}")
     print(f"   VECTORIZER_PATH={VECTORIZER_OUTPUT_PATH}")
+<<<<<<< HEAD
     print(f"   CONFIDENCE_THRESHOLD=0.6")
     print(f"   FLAG_LOW_CONFIDENCE=true")
+=======
+>>>>>>> 42c19e1f454b08381ffc8132bf9ae9f6a57dabda
 
 
 
