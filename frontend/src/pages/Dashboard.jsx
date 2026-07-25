@@ -16,8 +16,13 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import api from "../utils/axiosInstance";
+<<<<<<< Updated upstream
 import { PYTHON_API_BASE_URL } from "../utils/axiosInstance";
 import ActivityHeatmap from '../components/ActivityHeatmap';
+=======
+import ActivityHeatmap from '../components/ActivityHeatmap';
+
+>>>>>>> Stashed changes
 
 // Uses the `api` instance (for its auth-token interceptor) but targets the
 // Flask ML API directly, bypassing the Node backend.

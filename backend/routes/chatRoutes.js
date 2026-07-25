@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const { chatLimiter } = require("../middleware/rateLimiter");
+<<<<<<< Updated upstream
 const { chatHandler, healthCheck, listModels } = require("../controllers/chatController");
 
 // Chat endpoint with fallback support and rate limiting
@@ -14,3 +15,11 @@ router.get("/health", healthCheck);
 router.get("/models", listModels);
 
 module.exports = router;
+=======
+const { chatHandler } = require("../controllers/chatController");
+
+
+router.post("/", chatLimiter, chatHandler);
+
+module.exports = router;
+>>>>>>> Stashed changes

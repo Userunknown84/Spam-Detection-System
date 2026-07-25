@@ -1,8 +1,11 @@
 const { processBulkPrediction } = require("../services/bulkPredictService");
+<<<<<<< Updated upstream
 const logger = require("../utils/logger");
 
 const MAX_TEXT_LENGTH = 10000;
 const MIN_TEXT_LENGTH = 2;
+=======
+>>>>>>> Stashed changes
 
 /**
  * Extract a usable prediction text value from a CSV row.
@@ -13,7 +16,11 @@ const getPredictionInputFromRow = (row) => {
 
   const rowEntries = Object.entries(row);
   const textEntry = rowEntries.find(([key]) =>
+<<<<<<< Updated upstream
     ["text", "message", "content", "email", "sms", "tweet"].includes(key.trim().toLowerCase())
+=======
+    ["text", "message"].includes(key.trim().toLowerCase())
+>>>>>>> Stashed changes
   );
 
   if (!textEntry) return null;
@@ -39,22 +46,34 @@ const validateBulkPredictionRows = (rows, res) => {
   }
 
   const normalizedRows = [];
+<<<<<<< Updated upstream
   const errors = [];
+=======
+>>>>>>> Stashed changes
 
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
 
     if (!row || typeof row !== "object" || Array.isArray(row)) {
+<<<<<<< Updated upstream
       errors.push({
         row: index + 2,
         error: "Row is not a valid CSV record."
       });
       continue;
+=======
+      res.status(400).json({
+        success: false,
+        error: `Row ${index + 2} is not a valid CSV record.`,
+      });
+      return null;
+>>>>>>> Stashed changes
     }
 
     const predictionInput = getPredictionInputFromRow(row);
 
     if (!predictionInput) {
+<<<<<<< Updated upstream
       errors.push({
         row: index + 2,
         error: "Row is missing valid text content."
@@ -76,6 +95,13 @@ const validateBulkPredictionRows = (rows, res) => {
         error: `Text content too long. Maximum ${MAX_TEXT_LENGTH} characters allowed.`
       });
       continue;
+=======
+      res.status(400).json({
+        success: false,
+        error: `Row ${index + 2} is missing valid text content.`,
+      });
+      return null;
+>>>>>>> Stashed changes
     }
 
     normalizedRows.push({
@@ -84,6 +110,7 @@ const validateBulkPredictionRows = (rows, res) => {
     });
   }
 
+<<<<<<< Updated upstream
   if (errors.length > 0) {
     const errorSummary = {
       totalRows: rows.length,
@@ -100,6 +127,8 @@ const validateBulkPredictionRows = (rows, res) => {
     return null;
   }
 
+=======
+>>>>>>> Stashed changes
   return normalizedRows;
 };
 
@@ -114,6 +143,7 @@ exports.handleBulkPrediction = async (req, res) => {
 
     const { rows, filename, size } = req.parsedFile;
 
+<<<<<<< Updated upstream
     logger.info(`Bulk prediction requested: ${filename}, ${rows.length} rows`);
 
     const validatedRows = validateBulkPredictionRows(rows, res);
@@ -125,23 +155,37 @@ exports.handleBulkPrediction = async (req, res) => {
     const results = await processBulkPrediction(validatedRows);
 
     logger.info(`Bulk prediction completed: ${filename}, ${validatedRows.length} rows processed`);
+=======
+    // Process predictions
+    const results = await processBulkPrediction(rows);
+>>>>>>> Stashed changes
 
     res.json({
       success: true,
       totalRows: rows.length,
+<<<<<<< Updated upstream
       validRows: validatedRows.length,
       invalidRows: rows.length - validatedRows.length,
+=======
+>>>>>>> Stashed changes
       filename: filename,
       size: size,
       results: results
     });
   } catch (error) {
     console.error('Bulk prediction error:', error);
+<<<<<<< Updated upstream
     logger.error('Bulk prediction error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to process bulk prediction',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
+=======
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process bulk prediction',
+      details: error.message
+>>>>>>> Stashed changes
     });
   }
 };

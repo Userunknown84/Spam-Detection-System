@@ -14,6 +14,10 @@ const emailTransporter = require('../utils/emailTransporter');
 // TOKEN GENERATION
 // ============================================
 
+// ============================================
+// TOKEN GENERATION
+// ============================================
+
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
@@ -365,8 +369,13 @@ const forgotPassword = async (req, res) => {
 
     const secret = process.env.JWT_SECRET + user.password;
     const token = jwt.sign(
+<<<<<<< Updated upstream
       { id: user._id, email: user.email },
       secret,
+=======
+      { id: user._id, email: user.email }, 
+      secret, 
+>>>>>>> Stashed changes
       { expiresIn: process.env.PASSWORD_RESET_TOKEN_EXPIRES || '15m' }
     );
 
@@ -697,4 +706,15 @@ module.exports = {
   getRolesAndPermissions,
   generateToken,
   buildAuthResponse
+<<<<<<< Updated upstream
 };
+=======
+};
+
+module.exports = { register, login, logout, getMe, googleLogin, updateAvatar, forgotPassword, resetPassword, updateWebhook };
+
+
+  getSessionStatus
+};
+
+>>>>>>> Stashed changes

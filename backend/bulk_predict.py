@@ -3,14 +3,30 @@ import io
 import os
 
 
+
 import numpy as np
 
 from   flask                    import (Blueprint, current_app, jsonify,
                                         request, send_file)
 
+
+from extensions import limiter
+
+
+
+import numpy as np
+
+from flask import Blueprint, current_app, jsonify, request, send_file
+
+from api import limiter
+
+bulk_predict_bp = Blueprint("bulk_predict", __name__)
+
+
 from   rate_limiting            import RateLimitPolicy, rate_limit
 
 bulk_predict_bp = Blueprint("bulk_predict", __name__)
+
 
 
 def parse_and_predict_file(file):

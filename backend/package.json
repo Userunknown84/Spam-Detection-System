@@ -6,9 +6,14 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+
     "worker": "node worker.js",
+
     "test": "jest --testPathIgnorePatterns config --testPathIgnorePatterns avatarUpload --testPathIgnorePatterns keywordRules --testPathIgnorePatterns rateLimiter --testPathIgnorePatterns fileValidation && node --test tests/keywordRules.test.js tests/rateLimiter.test.js tests/avatarUpload.test.js tests/fileValidation.test.js",
     "lint": "eslint ."
+
+    "test": "jest --testPathIgnorePatterns config --testPathIgnorePatterns avatarUpload --testPathIgnorePatterns keywordRules --testPathIgnorePatterns rateLimiter --testPathIgnorePatterns fileValidation && node --test tests/keywordRules.test.js tests/rateLimiter.test.js tests/avatarUpload.test.js tests/fileValidation.test.js"
+
   },
   "keywords": [],
   "author": "",

@@ -14,11 +14,15 @@ const logFile = path.join(logDir, 'app.log');
 const writeToFile = (level, message) => {
   const timestamp = new Date().toISOString();
   const logEntry = `[${timestamp}] [${level.toUpperCase()}] : ${message}\n`;
+<<<<<<< Updated upstream
   fs.appendFile(logFile, logEntry, (err) => {
     if (err) {
       console.error('Error writing to log file:', err);
     }
   });
+=======
+  fs.appendFileSync(logFile, logEntry);
+>>>>>>> Stashed changes
 };
 
 // Custom Logger Object

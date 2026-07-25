@@ -12,7 +12,11 @@ const {
 } = require("../controllers/analyticsController");
 
 const { protect } = require("../middleware/authMiddleware");
+<<<<<<< Updated upstream
 const Prediction = require('../models/Prediction');
+=======
+
+>>>>>>> Stashed changes
 router.use(protect);
 router.get("/summary", getSummary);
 router.get("/trends", getTrends);

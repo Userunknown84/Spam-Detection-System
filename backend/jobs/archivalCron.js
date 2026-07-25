@@ -19,6 +19,7 @@ const archivalJob = async () => {
         while (true) {
             const batch = await History.find({ createdAt: { $lt: ninetyDaysAgo } })
                                        .limit(1000)
+<<<<<<< Updated upstream
                                        .lean();
             
             if (batch.length === 0) break;
@@ -57,6 +58,27 @@ const archivalJob = async () => {
                 console.error('❌ [Cron] Failed to delete archived records batch from History:', deleteError);
                 throw deleteError; // Rethrow since the state is now partially migrated but safe for retry
             }
+=======
+                                       .session(session);
+            
+            if (batch.length === 0) break;
+            
+            // Map the old records to the new schema
+            const mappedRecords = batch.map(record => ({
+                userId: record.user,
+                message: record.query,
+                prediction: record.prediction,
+                confidenceScore: record.confidence,
+                createdAt: record.createdAt
+            }));
+
+            // 2. Bulk insert them into the Archive collection
+            await HistoryArchive.insertMany(mappedRecords, { session });
+            
+            // 3. Bulk delete them from the main History collection
+            const batchIds = batch.map(doc => doc._id);
+            await History.deleteMany({ _id: { $in: batchIds } }, { session });
+>>>>>>> Stashed changes
             
             processedCount += batch.length;
         }

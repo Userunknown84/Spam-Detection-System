@@ -1,7 +1,11 @@
 // backend/controllers/activityController.js
 const mongoose = require('mongoose');
 const History = require('../models/History');
+<<<<<<< Updated upstream
 const { replacements, tonePrefixes } = require('../utils/despamificationRules');
+=======
+
+>>>>>>> Stashed changes
 // ==================== DE-SPAMIFICATION LOGIC ====================
 exports.despamify = async (req, res) => {
   try {
@@ -14,6 +18,35 @@ exports.despamify = async (req, res) => {
     // Simple de-spamification logic
     let deSpammed = text;
 
+<<<<<<< Updated upstream
+=======
+    const replacements = {
+      'URGENT': 'Someone wants to contact you',
+      'FREE': 'There is an offer',
+      'WIN': 'There is a notification',
+      'PRIZE': 'There is a message about rewards',
+      'CLAIM': 'There is a message for you',
+      'CLICK': 'There is a link to visit',
+      'NOW': 'soon',
+      '!!!': '.',
+      '$$$': '',
+      '100%': '',
+      'GUARANTEED': '',
+      'LIMITED TIME': '',
+      'ACT NOW': '',
+      "DON'T MISS": '',
+      'EXCLUSIVE': '',
+      'YOU WON': 'There is a notification'
+    };
+
+    // Apply tone adjustments
+    const tonePrefixes = {
+      neutral: '',
+      friendly: 'Hi there! ',
+      formal: 'We would like to inform you that ',
+      casual: 'Hey! '
+    };
+>>>>>>> Stashed changes
 
     const prefix = tonePrefixes[tone] || '';
 
@@ -88,11 +121,16 @@ exports.getStats = async (req, res) => {
 };
 
 // ==================== USER ACTIVITY HEATMAP LOGIC ====================
+<<<<<<< Updated upstream
+=======
+// ==================== USER ACTIVITY HEATMAP LOGIC ====================
+>>>>>>> Stashed changes
 exports.getActivity = async (req, res) => {
   try {
     const { userId } = req.params;
     const { year, month } = req.query;
 
+<<<<<<< Updated upstream
     const yearNum = parseInt(year, 10);
     const monthNum = parseInt(month, 10);
 
@@ -106,6 +144,8 @@ exports.getActivity = async (req, res) => {
       return res.status(400).json({ error: "Month must be between 1 and 12." });
     }
 
+=======
+>>>>>>> Stashed changes
     // Validate user id format before using it in aggregation
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ error: "Invalid user id" });
@@ -118,8 +158,13 @@ exports.getActivity = async (req, res) => {
       });
     }
 
+<<<<<<< Updated upstream
     const startDate = new Date(yearNum, monthNum - 1, 1);
     const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+=======
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+>>>>>>> Stashed changes
 
     const activities = await History.aggregate([
       {

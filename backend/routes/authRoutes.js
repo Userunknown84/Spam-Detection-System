@@ -75,6 +75,7 @@ const buildAuthResponse = (user, token) => ({
 
 
 // ============================================
+<<<<<<< Updated upstream
 // TOKEN GENERATION
 // ============================================
 
@@ -99,6 +100,8 @@ const buildAuthResponse = (user, token) => ({
 
 
 // ============================================
+=======
+>>>>>>> Stashed changes
 // AUTH CONTROLLERS
 // ============================================
 
@@ -553,6 +556,7 @@ const getSessionStatus = async (req, res) => {
 };
 
 // ============================================
+<<<<<<< Updated upstream
 // AUTH CONTROLLERS
 // ============================================
 
@@ -1031,6 +1035,8 @@ const assignRole = async (req, res) => {
       });
     }
 
+=======
+>>>>>>> Stashed changes
 // ZERO TRUST - ROLE MANAGEMENT
 // ============================================
 
@@ -1376,7 +1382,10 @@ const assignRole = async (req, res) => {
       });
     }
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
@@ -1457,9 +1466,12 @@ const getUserPermissions = async (req, res) => {
   }
 };
 
+<<<<<<< Updated upstream
   }
 };
 
+=======
+>>>>>>> Stashed changes
 
 // @desc    Get all roles and permissions (Public)
 // @route   GET /api/auth/roles
@@ -1484,7 +1496,10 @@ const getRolesAndPermissions = async (req, res) => {
 
 
 
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 // @desc    Get all roles and permissions (Public)
 // @route   GET /api/auth/roles
 const getRolesAndPermissions = async (req, res) => {

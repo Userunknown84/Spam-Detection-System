@@ -45,6 +45,9 @@ router.get('/recent',protect, async(req,res)=> {
   }
     });
 
+module.exports = router;
+
+
 router.get('/',protect,async(req,res) => {
   try{
     const{startDate, endDate, limit =50 } =req.query;
