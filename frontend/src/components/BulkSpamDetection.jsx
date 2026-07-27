@@ -49,7 +49,7 @@ export default function BulkSpamDetection() {
 
     try {
       const res = await api.post(
-        `${import.meta.env.VITE_API_URI || ""}/bulk-predict`,
+        "/bulk-predict",
         formData,
         {
           headers: {
@@ -78,7 +78,7 @@ export default function BulkSpamDetection() {
 
     try {
       const res = await api.post(
-        `${import.meta.env.VITE_API_URI || ""}/bulk-predict/export`,
+        "/bulk-predict/export",
         formData,
         {
           headers: {

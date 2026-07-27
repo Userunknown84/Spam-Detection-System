@@ -3,33 +3,7 @@ const axios = require('axios');
 const WebhookDelivery = require('../models/WebhookDelivery');
 const net = require('net');
 
-/**
- * Checks if a webhook URL is safe from SSRF attacks.
- */
-const isSafeWebhookUrl = (webhookUrl) => {
-  try {
-    const parsed = new URL(webhookUrl);
-    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
-
-    const host = parsed.hostname.toLowerCase();
-    if (host === 'localhost') return false;
-
-    if (net.isIP(host)) {
-      if (host.startsWith('127.') || host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('169.254.')) return false;
-      const parts = host.split('.');
-      if (parts.length === 4) {
-        const first = parseInt(parts[0], 10);
-        const second = parseInt(parts[1], 10);
-        if (first === 172 && second >= 16 && second <= 31) return false;
-        if (first === 0) return false;
-      }
-      if (host === '::1' || host.startsWith('fe80:') || host.startsWith('fc00:') || host.startsWith('fd00:')) return false;
-    }
-    return true;
-  } catch (e) {
-    return false;
-  }
-};
+const { isSafeWebhookUrl } = require('../utils/urlValidator');
 
 const processWebhooks = async () => {
   try {
@@ -60,7 +34,7 @@ const processWebhooks = async () => {
       }
 
       // Check SSRF immediately before delivery
-      if (!isSafeWebhookUrl(job.url)) {
+      if (!(await isSafeWebhookUrl(job.url))) {
         console.warn(`[Webhook Blocked] SSRF validation failed for job ${job._id} right before delivery.`);
         job.status = 'rejected';
         job.lastError = 'SSRF validation failed immediately prior to delivery';

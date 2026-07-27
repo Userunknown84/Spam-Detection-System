@@ -13,3 +13,5 @@ output/
 # IMAP connections/scan history (contains encrypted credentials)
 imap_connections.db
 
+*.db-shm
+*.db-wal

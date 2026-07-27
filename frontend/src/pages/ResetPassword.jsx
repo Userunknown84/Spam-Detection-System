@@ -43,7 +43,7 @@ const ResetPassword = () => {
     setMessage('');
     
     try {
-      const res = await api.post(`${import.meta.env.VITE_API_URI}/api/auth/reset-password/${id}/${token}`, { password: form.password });
+      const res = await api.post(`/api/auth/reset-password/${id}/${token}`, { password: form.password });
       setMessage(res.data.message || 'Password successfully reset.');
       
       // Auto redirect to login after 3 seconds

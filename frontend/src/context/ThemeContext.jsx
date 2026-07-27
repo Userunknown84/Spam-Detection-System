@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 
 const ThemeContext = createContext(null);
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant colocated with its provider
 export const THEME_PALETTES = {
   ocean: {
     name: "🌊 Ocean",
@@ -129,6 +130,7 @@ export const ThemeProvider = ({ children }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook colocated with its provider
 export const useTheme = () => {
   const context = useContext(ThemeContext);
   if (!context) {

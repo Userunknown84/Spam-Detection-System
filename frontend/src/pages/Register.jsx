@@ -31,11 +31,8 @@ const Register = () => {
 
     setLoading(true);
     try {
-      // await api.post(`${import.meta.env.VITE_API_URI}/api/auth/register`, form);
-      // setSuccess('Account created! Redirecting to login...');
-      // setTimeout(() => navigate('/'), 1500);
       const res = await api.post(
-        `${import.meta.env.VITE_API_URI}/api/auth/register`,
+        "/api/auth/register",
         form
       );
 
@@ -59,7 +56,7 @@ const Register = () => {
     setError('');
     setSuccess('');
     try {
-      const res = await api.post(`${import.meta.env.VITE_API_URI}/api/auth/google`, {
+      const res = await api.post('/api/auth/google', {
         idToken: credentialResponse.credential,
       });
       localStorage.setItem('token', res.data.token);

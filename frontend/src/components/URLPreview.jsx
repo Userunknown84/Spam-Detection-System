@@ -1,7 +1,16 @@
-import React, {useState,useEffect} from 'react';
-import api from '../utils/axiosInstance';
+import React, {useState} from 'react';
 
-const URLPreview = ({ url,children,darkMode }) => {
+// Maps the backend's domain_analysis-derived risk level (issue #822) to this
+// component's existing status vocabulary, so the preview UI stays the same
+// regardless of whether the signal came from the server or the local
+// fallback heuristic below.
+const URL_RISK_LEVEL_TO_STATUS = {
+    SAFE: 'safe',
+    WARNING: 'warning',
+    BLOCK: 'danger',
+};
+
+const URLPreview = ({ url, children, darkMode, urlRisk }) => {
     const [showPreview, setShowPreview] = useState(false);
     const [previewData, setPreviewData] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -40,9 +49,18 @@ const URLPreview = ({ url,children,darkMode }) => {
 
       const checkDomainReputation = async (domain) => {
     try {
-      // integrate with external APIs like VirusTotal, Google Safe Browsing
-      // For now, using local checks
-      const status = getSafetyStatus(domain);
+      // Prefer the backend's real risk signal (domain age, DNSBL/threat
+      // intel checks, suspicious-TLD/IP heuristics - see domain_checker.py)
+      // when the /predict response already analyzed this URL. Only fall
+      // back to the local shortener/keyword heuristic when it hasn't run
+      // yet (e.g. hovering before submitting).
+      const status = urlRisk
+        ? {
+            status: URL_RISK_LEVEL_TO_STATUS[urlRisk.level] || 'unknown',
+            label: `Risk score ${urlRisk.score}/100 (${urlRisk.level})`,
+            color: getStatusColor(URL_RISK_LEVEL_TO_STATUS[urlRisk.level]),
+          }
+        : getSafetyStatus(domain);
       setPreviewData({
         domain,
         status: status.status,

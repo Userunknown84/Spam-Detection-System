@@ -90,14 +90,6 @@ label_encoder = joblib.load(LABEL_ENCODER_PATH)
 def home():
     return "ML API Running 🚀"
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'model_loaded': model is not None,
-        'vectorizer_loaded': vectorizer is not None
-    })
-
 
 # ─── HEALTH CHECK ENDPOINT ───────────────────────────────────────
 @app.route("/health", methods=["GET"])

@@ -45,17 +45,21 @@ const historySchema = new mongoose.Schema(
       default: 0
     },
     feedback: {
-      type: String,
-      enum: {
-        values: ["correct", "incorrect"],
-        message: "Feedback must be either 'correct' or 'incorrect'"
+      label: {
+        type: String,
+        enum: {
+          values: ["correct", "incorrect"],
+          message: "Feedback must be either 'correct' or 'incorrect'"
+        }
       },
-      default: null
-    },
-    feedbackNote: {
-      type: String,
-      trim: true,
-      maxlength: [500, "Feedback note cannot exceed 500 characters"]
+      note: {
+        type: String,
+        trim: true,
+        maxlength: [500, "Feedback note cannot exceed 500 characters"]
+      },
+      submittedAt: {
+        type: Date
+      }
     },
     ipAddress: {
       type: String,
@@ -82,7 +86,7 @@ historySchema.index({ user: 1, prediction: 1 }, { background: true });
 historySchema.index({ user: 1, type: 1 }, { background: true });
 historySchema.index({ prediction: 1 });
 historySchema.index({ type: 1 });
-historySchema.index({ feedback: 1 });
+historySchema.index({ "feedback.label": 1 });
 historySchema.index({ createdAt: -1 });
 
 historySchema.virtual('typeLabel').get(function() {

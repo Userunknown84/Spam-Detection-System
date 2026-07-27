@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
-import api from "../utils/axiosInstance";
+import api, { pythonApi } from "../utils/axiosInstance";
 
 export default function EmailScannerDashboard() {
   const { isDark, activeTheme } = useTheme();
@@ -59,10 +59,6 @@ const checkConnectionStatus = async () => {
   }
 };
 
-// Auth, user data — Node
-const fetchUser = async () => {
-  const res = await api.get("/user/profile");
-};
   const refreshImapStatus = async () => {
     try {
       const res = await api.get("/imap/status");
@@ -121,6 +117,29 @@ const fetchUser = async () => {
       else setLoadingOutlook(false);
     }
   };
+
+ const handleFeedback = async (email, correctLabel) => {
+  try {
+    const token = localStorage.getItem('token');
+    await axios.post('/api/feedback', {
+      text: email.body,
+      predicted_label: email.prediction,
+      correct_label: correctLabel,
+      sender: email.sender,
+      confidence: email.confidence
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    setEmails(prev => prev.map(e => 
+      e.id === email.id ? { ...e, feedbackGiven: true } : e
+    ));
+    
+    toast.success('Thank you for your feedback!');
+  } catch (error) {
+    toast.error('Failed to save feedback');
+  }
+};
 
   const handleScan = async (provider) => {
     if (!provider) return;
@@ -365,6 +384,22 @@ const fetchUser = async () => {
             )}
           </div>
         </div>
+        <div className="email-actions">
+          {!email.feedbackGiven && (
+          <>
+          <button onClick={() => handleFeedback(email, 'ham')}>
+          ✅ Mark as Safe
+          </button>
+          <button onClick={() => handleFeedback(email, 'spam')}>
+        🚫 Mark as Spam
+        </button>
+        </>
+       )}
+    {email.feedbackGiven && (
+    <span className="feedback-thanks">✅ Thanks for your feedback!</span>
+    )}
+    </div>
+
         {/* IMAP Card */}
         <div className={`p-5 rounded-2xl border transition-all duration-300 ${
           isDark ? "bg-slate-900/40 border-slate-800" : "bg-white/45 border-slate-200"

@@ -1,6 +1,12 @@
 import re
 from typing import Dict, List
 
+# Analysis runs on attacker-controlled message text; cap the length scanned so a
+# pathologically large payload cannot degrade the many per-message regex/keyword
+# passes. Real traffic is far shorter (the ML API caps request text), so the
+# guard never trims a legitimate message (issue #940).
+MAX_TEXT_LENGTH = 100_000
+
 
 class ExplanationEngine:
     """Explainable AI engine for spam prediction text analysis."""
@@ -10,10 +16,20 @@ class ExplanationEngine:
         r"\b(?:bit\.ly|tinyurl\.com|goo\.gl|ow\.ly|t\.co|is\.gd|buff\.ly|rb\.gy|shorte\.st|lnkd\.in|qr\.ae)\b",
         re.IGNORECASE,
     )
-    PHONE_PATTERN = re.compile(r"\b(?:\+?\d[\d\s().-]{7,}\d)\b")
+    # Middle run bounded: a phone number never spans dozens of separators, and
+    # the bound stops the greedy class overlapping the trailing digit on
+    # adversarial digit/space strings (issue #940).
+    PHONE_PATTERN = re.compile(r"\b(?:\+?\d[\d\s().-]{7,40}\d)\b")
     EMOJI_PATTERN = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF]+")
     EXCESSIVE_PUNCTUATION_PATTERN = re.compile(r"([!?])\1{1,}|\.{3,}|[,;:]{3,}")
     WORD_PATTERN = re.compile(r"\b[\w']+\b")
+    # Suspicious-TLD domain shape. Labels/TLD are bounded to the DNS 63-octet
+    # limit and the sub-label repetition is capped, so the nested (label.)+
+    # quantifier can no longer backtrack pathologically on long label runs;
+    # realistic domains (a few <=63-char labels) match identically (issue #940).
+    SUSPICIOUS_DOMAIN_PATTERN = re.compile(
+        r"\b(?:[a-zA-Z0-9-]{1,63}\.){1,20}[a-zA-Z]{2,63}\b"
+    )
     SUSPICIOUS_TLDS = {
         "tk",
         "ml",
@@ -150,7 +166,7 @@ class ExplanationEngine:
         return found
 
     def _find_suspicious_domain(self, text: str) -> bool:
-        matches = re.findall(r"\b(?:[a-zA-Z0-9-]+\.)+(?:[a-zA-Z]{2,})\b", text)
+        matches = self.SUSPICIOUS_DOMAIN_PATTERN.findall(text)
         for domain in matches:
             if domain.split(".")[-1].lower() in self.SUSPICIOUS_TLDS:
                 return True
@@ -162,6 +178,8 @@ class ExplanationEngine:
         return len(all_caps) >= 2
 
     def analyze(self, text: str, input_type: str = "message") -> Dict:
+        if text and len(text) > MAX_TEXT_LENGTH:
+            text = text[:MAX_TEXT_LENGTH]
         normalized = text.strip()
         lower = normalized.lower()
 

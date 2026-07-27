@@ -108,7 +108,11 @@ def analyze_headers(headers_text):
     # 1. Display name spoofing (e.g. From: "paypal.com" <scammer@gmail.com>)
     display_name, _ = parseaddr(from_header)
     if display_name and "@" in display_name:
-        display_email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', display_name)
+        # Bounded local/domain/TLD spans: the address parts and the trailing
+        # `.tld` overlap on `.`/word characters, so the unbounded `+` runs
+        # backtrack quadratically on a long adversarial display name. Realistic
+        # addresses fit these limits, so matching is unchanged (issue #940).
+        display_email_match = re.search(r'[\w\.-]{1,256}@[\w\.-]{1,256}\.\w{1,63}', display_name)
         if display_email_match:
             display_email = display_email_match.group(0)
             display_domain = extract_domain(display_email)

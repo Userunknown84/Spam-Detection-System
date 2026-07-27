@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from "../context/ThemeContext";
 import api from "../utils/axiosInstance";
+import { SpamTrends } from './SpamTrends';
+import { RecentActivity } from './RecentActivity';
+import { RateLimitDashboard } from './RateLimitDashboard';
+
 
 export default function SpamInsightsDashboard() {
   const [insights, setInsights] = useState(null);
@@ -14,8 +18,8 @@ export default function SpamInsightsDashboard() {
     setError("");
     try {
       const url = cat
-        ? `${import.meta.env.VITE_API_URI || ""}/spam-insights?category=${cat}`
-        : `${import.meta.env.VITE_API_URI || ""}/spam-insights`;
+        ? `/spam-insights?category=${cat}`
+        : "/spam-insights";
       const res = await api.get(url);
       setInsights(res.data);
     } catch (err) {
@@ -183,6 +187,20 @@ export default function SpamInsightsDashboard() {
             </div>
           </div>
 
+          <div className="dashboard-section">
+             <SpamTrends />
+          </div>
+
+          <div className="dashboard-section">
+             <RecentActivity />
+          </div>
+
+          <div className="dashboard-section">
+             <RateLimitDashboard />
+          </div>
+
+
+
           {/* Recent Suspicious Terms */}
           <h3 className="text-[10px] font-extrabold uppercase tracking-wider mb-2 opacity-70">Recently Detected Terms</h3>
           <div className="flex flex-wrap gap-1.5">
@@ -205,6 +223,8 @@ export default function SpamInsightsDashboard() {
           </div>
         </div>
       )}
+
+      <FeedbackInsights />
     </div>
   );
 }

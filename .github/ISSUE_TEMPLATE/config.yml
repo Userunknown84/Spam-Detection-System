@@ -1,0 +1,6 @@
+blank_issues_enabled: true
+
+contact_links:
+  - name: 🔒 Report a Security Vulnerability
+    url: https://github.com/Userunknown84/Spam-Detection-System/security/advisories/new
+    about: Please report security vulnerabilities privately instead of creating a public issue.

@@ -25,6 +25,25 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Configuring the API URL
+
+This app talks to the Node backend (see the root `README.md`) at a URL resolved in `constants/api.ts` from two Expo public env vars:
+
+| Var | Used when | Default if unset |
+|---|---|---|
+| `EXPO_PUBLIC_ANDROIDAPI` | Running on Android | `http://10.0.2.2:3000` (the emulator's alias for your host machine) |
+| `EXPO_PUBLIC_IOSAPI` | Running on iOS | `http://localhost:3000` |
+
+Copy `.env.example` to `.env` to override them:
+
+```bash
+cp .env.example .env
+```
+
+The defaults work out of the box for the **Android emulator** and **iOS simulator** with a backend running locally on port 3000 - you'll see a console warning if you're relying on them, since they silently stop working in one common case:
+
+- **Testing on a real physical device**: neither `10.0.2.2` nor `localhost` can reach your dev machine from a phone. Find your machine's LAN IP (`ipconfig` on Windows, `ifconfig`/`ip a` on macOS/Linux) and set it in `.env`, e.g. `EXPO_PUBLIC_ANDROIDAPI=http://192.168.1.5:3000`. Your phone and dev machine need to be on the same network.
+
 ## Get a fresh project
 
 When you're ready, run:

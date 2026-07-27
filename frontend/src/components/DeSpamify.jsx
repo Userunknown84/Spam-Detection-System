@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import api from '../utils/axiosInstance';
 
+// Optional: agar toast library use karte ho toh import karo, nahi toh hata dena
+// import toast from 'react-hot-toast';
+
 const DeSpamify = ({ text, darkMode, onClose }) => {
   const [deSpammedText, setDeSpammedText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -10,27 +13,47 @@ const DeSpamify = ({ text, darkMode, onClose }) => {
   const [showOriginal, setShowOriginal] = useState(true);
 
   const deSpamifyText = async () => {
-    if (!text) return;
+    // ✅ Prevent if no text
+    if (!text || !text.trim()) {
+      // Agar toast hai toh dikhao
+      if (typeof toast !== 'undefined') {
+        toast.error('Please enter some text to de-spamify');
+      }
+      return;
+    }
     
+    // ✅ Start loading
     setLoading(true);
+    
     try {
       const response = await api.post('/api/despamify', {
         text: text,
         tone: tone
       });
       setDeSpammedText(response.data.deSpammedText);
+      
+      // ✅ Success toast (optional)
+      if (typeof toast !== 'undefined') {
+        toast.success('✨ Message de-spamified successfully!');
+      }
     } catch (error) {
       console.error('De-spamification failed:', error);
-      // Fallback: simple de-spamification
+      
+      // ✅ Fallback
       const fallback = deSpamifyFallback(text);
       setDeSpammedText(fallback);
+      
+      // ✅ Error toast (optional)
+      if (typeof toast !== 'undefined') {
+        toast.error('Failed to de-spamify. Using fallback...');
+      }
     } finally {
+      // ✅ Stop loading
       setLoading(false);
     }
   };
 
   const deSpamifyFallback = (text) => {
-    // Simple rule-based de-spamification
     let result = text;
     const replacements = {
       'URGENT': 'Someone wants to contact you',
@@ -56,7 +79,6 @@ const DeSpamify = ({ text, darkMode, onClose }) => {
       result = result.replace(new RegExp(escapeRegex(key), 'gi'), value);
     }
     
-    // Clean up extra spaces and punctuation
     result = result.replace(/\s+/g, ' ').trim();
     return result || 'Someone wants to contact you.';
   };
@@ -152,7 +174,7 @@ const DeSpamify = ({ text, darkMode, onClose }) => {
         </div>
       )}
 
-      {/* De-Spamify Button */}
+      {/* ✅ MAIN BUTTON WITH LOADING SPINNER */}
       <button
         onClick={deSpamifyText}
         disabled={loading}
@@ -160,6 +182,7 @@ const DeSpamify = ({ text, darkMode, onClose }) => {
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">
+            {/* ✅ Spinner Animation */}
             <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></span>
             De-Spamifying...
           </span>

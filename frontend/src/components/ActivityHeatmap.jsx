@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-// import api from '../api';
+import React, { useState, useEffect } from 'react';
+import api from '../utils/axiosInstance';
 
-const ActivityHeatmap = ({ userId, startDate, endDate }) => {
+const ActivityHeatmap = ({ userId, darkMode }) => {
     const [activityData, setActivityData] = useState([]);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDay, setSelectedDay] = useState(null);

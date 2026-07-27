@@ -16,16 +16,25 @@ describe('Webhook Retry Queue & Cron Job', () => {
   });
 
   describe('isSafeWebhookUrl Validation', () => {
-    it('should reject unsafe URLs', () => {
-      expect(isSafeWebhookUrl('http://localhost:8080')).toBe(false);
-      expect(isSafeWebhookUrl('http://127.0.0.1/test')).toBe(false);
-      expect(isSafeWebhookUrl('http://169.254.169.254/latest/meta-data')).toBe(false);
-      expect(isSafeWebhookUrl('ftp://test.com')).toBe(false);
+    it('should reject unsafe URLs', async () => {
+      expect(await isSafeWebhookUrl('http://localhost:8080')).toBe(false);
+      expect(await isSafeWebhookUrl('http://127.0.0.1/test')).toBe(false);
+      expect(await isSafeWebhookUrl('http://169.254.169.254/latest/meta-data')).toBe(false);
+      expect(await isSafeWebhookUrl('ftp://test.com')).toBe(false);
     });
 
-    it('should allow safe URLs', () => {
-      expect(isSafeWebhookUrl('https://webhook.site/test')).toBe(true);
-      expect(isSafeWebhookUrl('http://api.github.com/')).toBe(true);
+    it('should allow safe URLs', async () => {
+      expect(await isSafeWebhookUrl('https://webhook.site/test')).toBe(true);
+      expect(await isSafeWebhookUrl('http://api.github.com/')).toBe(true);
+    });
+
+    it('should reject alternate IP encodings', async () => {
+      expect(await isSafeWebhookUrl('http://0x7f000001')).toBe(false);
+      expect(await isSafeWebhookUrl('http://2130706433')).toBe(false);
+      expect(await isSafeWebhookUrl('http://0177.0.0.1')).toBe(false);
+      expect(await isSafeWebhookUrl('http://0x7f.0.0.1')).toBe(false);
+      expect(await isSafeWebhookUrl('http://[::ffff:127.0.0.1]')).toBe(false);
+      expect(await isSafeWebhookUrl('http://[::ffff:7f00:1]')).toBe(false);
     });
   });
 

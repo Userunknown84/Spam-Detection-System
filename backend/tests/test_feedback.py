@@ -86,7 +86,9 @@ class TestFeedback:
             "correct_label": "offensive",
         })
         assert res.status_code == 400
-        assert res.get_json() == {"error": "Invalid feedback data"}
+        body = res.get_json()
+        assert body["error"] == "Invalid feedback data"
+        assert body["error_detail"]["code"] == "INVALID_FEEDBACK"
         assert not feedback_file.exists()
 
     def test_missing_text_rejected(self, client):
@@ -96,7 +98,9 @@ class TestFeedback:
             "correct_label": "spam",
         })
         assert res.status_code == 400
-        assert res.get_json() == {"error": "Invalid feedback data"}
+        body = res.get_json()
+        assert body["error"] == "Invalid feedback data"
+        assert body["error_detail"]["code"] == "INVALID_FEEDBACK"
         assert not feedback_file.exists()
 
     def test_missing_correct_label_rejected(self, client):
@@ -106,5 +110,82 @@ class TestFeedback:
             "predicted_label": "ham",
         })
         assert res.status_code == 400
-        assert res.get_json() == {"error": "Invalid feedback data"}
+        body = res.get_json()
+        assert body["error"] == "Invalid feedback data"
+        assert body["error_detail"]["code"] == "INVALID_FEEDBACK"
         assert not feedback_file.exists()
+
+
+class TestFeedbackStats:
+    """Covers the GET /feedback/stats endpoint added for #823, which
+    surfaces the previously write-only feedback data collected above."""
+
+    def test_empty_when_no_feedback_yet(self, client):
+        c, _ = client
+        res = c.get("/feedback/stats")
+        assert res.status_code == 200
+        assert res.get_json() == {
+            "total": 0,
+            "corrections": 0,
+            "correction_rate": 0.0,
+            "by_predicted_label": {},
+            "recent": [],
+        }
+
+    def test_aggregates_corrections_and_confirmations(self, client):
+        c, _ = client
+        # ham predicted, corrected to spam twice, confirmed as ham once
+        c.post("/feedback", json={"text": "a", "predicted_label": "ham", "correct_label": "spam"})
+        c.post("/feedback", json={"text": "b", "predicted_label": "ham", "correct_label": "spam"})
+        c.post("/feedback", json={"text": "c", "predicted_label": "ham", "correct_label": "ham"})
+        # spam predicted, corrected to smishing once
+        c.post("/feedback", json={"text": "d", "predicted_label": "spam", "correct_label": "smishing"})
+
+        res = c.get("/feedback/stats")
+        assert res.status_code == 200
+        data = res.get_json()
+
+        assert data["total"] == 4
+        assert data["corrections"] == 3
+        assert data["correction_rate"] == 0.75
+
+        assert data["by_predicted_label"]["ham"]["total"] == 3
+        assert data["by_predicted_label"]["ham"]["corrections"] == 2
+        assert data["by_predicted_label"]["ham"]["corrected_to"] == {"spam": 2}
+
+        assert data["by_predicted_label"]["spam"]["total"] == 1
+        assert data["by_predicted_label"]["spam"]["corrections"] == 1
+        assert data["by_predicted_label"]["spam"]["corrected_to"] == {"smishing": 1}
+
+    def test_recent_is_most_recent_first_and_capped_at_20(self, client):
+        c, _ = client
+        for i in range(25):
+            c.post("/feedback", json={
+                "text": f"message {i}",
+                "predicted_label": "ham",
+                "correct_label": "spam",
+            })
+
+        res = c.get("/feedback/stats")
+        data = res.get_json()
+
+        assert data["total"] == 25
+        assert len(data["recent"]) == 20
+        # Most recently submitted (message 24) should be first.
+        assert data["recent"][0]["text_preview"] == "message 24"
+        assert data["recent"][0]["predicted_label"] == "ham"
+        assert data["recent"][0]["correct_label"] == "spam"
+        assert data["recent"][0]["submitted_at"]
+
+    def test_text_preview_truncated(self, client):
+        c, _ = client
+        long_text = "x" * 500
+        c.post("/feedback", json={
+            "text": long_text,
+            "predicted_label": "ham",
+            "correct_label": "spam",
+        })
+
+        res = c.get("/feedback/stats")
+        data = res.get_json()
+        assert len(data["recent"][0]["text_preview"]) == 100

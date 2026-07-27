@@ -25,7 +25,7 @@ const ForgotPassword = () => {
     setMessage('');
     
     try {
-      const res = await api.post(`${import.meta.env.VITE_API_URI}/api/auth/forgot-password`, { email });
+      const res = await api.post('/api/auth/forgot-password', { email });
       setMessage(res.data.message || 'If an account with that email exists, a reset link has been sent.');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send password reset request.');

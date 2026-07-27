@@ -32,6 +32,8 @@ import tempfile
 import subprocess
 import time
 
+from html_sanitizer import sanitize_html_for_rendering
+
 # ============================================
 # CONFIGURATION
 # ============================================
@@ -49,6 +51,23 @@ VECTORIZER_PATH = MODELS_DIR / 'ocr_vectorizer.pkl'
 # EMAIL RENDERER
 # ============================================
 
+# Chrome/Chromium flags that keep the headless renderer from reaching the
+# network. "--host-resolver-rules=MAP * ~NOTFOUND" makes every hostname fail to
+# resolve, so even a resource URL that slips past sanitization cannot be fetched
+# (defence-in-depth against SSRF). The rest disable background networking that
+# could otherwise phone home.
+SSRF_SAFE_BROWSER_FLAGS = [
+    "--host-resolver-rules=MAP * ~NOTFOUND",
+    "--no-proxy-server",
+    "--disable-background-networking",
+    "--disable-sync",
+    "--disable-default-apps",
+    "--disable-extensions",
+    "--disable-component-update",
+    "--no-first-run",
+]
+
+
 class EmailRenderer:
     """Renders HTML emails as images for visual analysis"""
     
@@ -57,10 +76,17 @@ class EmailRenderer:
         
     def render(self, html_content, width=800, height=600):
         """Render HTML content as PIL Image"""
+        # Strip anything that would trigger an outbound fetch (external images,
+        # stylesheets, iframes, private/link-local/metadata URLs) before the
+        # untrusted HTML reaches the browser. See issue #925.
+        html_content = sanitize_html_for_rendering(html_content)
         try:
             # Try using html2image
             from html2image import Html2Image
-            hti = Html2Image(output_path=self.temp_dir)
+            hti = Html2Image(
+                output_path=self.temp_dir,
+                custom_flags=SSRF_SAFE_BROWSER_FLAGS,
+            )
             
             # Create temp HTML file
             html_file = os.path.join(self.temp_dir, 'email.html')

@@ -9,19 +9,22 @@ const LABEL_DISPLAY = {
   smishing: "Smishing",
 };
 
-export default function FeedbackWidget({ text, predictedLabel, darkMode }) {
+export default function FeedbackWidget({ text, predictedLabel, darkMode, historyId }) {
   const [submitted, setSubmitted] = useState(false);
   const [showCorrection, setShowCorrection] = useState(false);
   const [correctLabel, setCorrectLabel] = useState("");
+  const [note, setNote] = useState("");
   const [error, setError] = useState(null);
 
   const submitFeedback = async (label) => {
     setError(null);
     try {
-      await api.post(`${import.meta.env.VITE_API_URI}/feedback`, {
+      await api.post('/feedback', {
         text,
         predicted_label: predictedLabel,
         correct_label: label,
+        historyId,
+        note
       });
       setSubmitted(true);
     } catch {
@@ -75,6 +78,16 @@ export default function FeedbackWidget({ text, predictedLabel, darkMode }) {
               </option>
             ))}
           </select>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional note about why (e.g. 'This is an important work email')"
+            className={`mt-2 w-full p-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+              darkMode ? "bg-gray-700 text-white border-gray-600" : "bg-white text-black border-gray-300"
+            }`}
+            rows={2}
+            maxLength={500}
+          />
           <button
             onClick={() => submitFeedback(correctLabel)}
             disabled={!correctLabel}

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-// Utility to prevent XSS rendering
+
 const escapeHTML = (str) => {
     if (!str) return '';
     return str
@@ -53,7 +53,7 @@ const fetchHistory = async () => {
             });
             setSelectedItems([]);
             fetchHistory();
-        } catch (error) {
+        } catch {
             alert('Failed to delete items');
         }
     };
@@ -73,7 +73,7 @@ const fetchHistory = async () => {
             });
             setSelectedItems([]);
             fetchHistory();
-        } catch (error) {
+        } catch {
             alert('Failed to clear history');
         }
     };
@@ -301,6 +301,7 @@ const fetchHistory = async () => {
                 ))
             )}
         </div>
-    )
+    );
 };
+
 export default History;

@@ -1,5 +1,0 @@
-[33m4eeb2c7[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeat/login-issue[m[33m, [m[1;32mmain[m[33m)[m Merge pull request #420 from devprashant19/fix/chat-rate-limiting
-[33m835643a[m Merge branch 'main' into fix/chat-rate-limiting
-[33m55c685b[m Merge pull request #419 from devprashant19/fix/negative-pagination-crash
-[33md21ed57[m Merge pull request #418 from devprashant19/fix/google-login-query-loop
-[33m668cd00[m Merge pull request #417 from devprashant19/fix/pdf-export-rate-limit

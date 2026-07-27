@@ -5,6 +5,11 @@ const redis = require('redis');
 
 let redisClient = null;
 let store = undefined;
+res.setHeader('X-RateLimit-Limit', 100);
+  res.setHeader('X-RateLimit-Remaining', remaining);
+  res.setHeader('X-RateLimit-Reset', Math.floor(Date.now() / 1000) + 3600);
+  
+  next();
 
 if (process.env.REDIS_URL) {
   try {

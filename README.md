@@ -1,6 +1,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Docker Build](https://github.com/Userunknown84/Spam-Detection-System/actions/workflows/docker.yml/badge.svg)
+[![CI](https://github.com/Userunknown84/Spam-Detection-System/actions/workflows/ci.yml/badge.svg)](https://github.com/Userunknown84/Spam-Detection-System/actions/workflows/ci.yml)
 
 # 🚀 Spam Detection System
 
@@ -36,6 +37,23 @@ Python: (http://localhost:5000 or http://127.0.0.1:5000)
 Node: (http://localhost:3000)
 Reactjs: (http://localhost:5173)
 
+
+---
+## 📄 API Reference
+
+The Flask ML API publishes a machine-readable OpenAPI 3.0 contract, so
+integrators (the Node gateway, browser extension, mobile app) can generate
+typed SDKs or validate requests instead of reading `api.py` by hand.
+
+* **OpenAPI spec:** [`GET /openapi.json`](http://127.0.0.1:5000/openapi.json) —
+  the full OpenAPI 3.0 document (info, servers, the `X-Internal-Secret`
+  security scheme, and every route's request/response schema).
+* **Swagger UI:** [`GET /docs`](http://127.0.0.1:5000/docs) — interactive,
+  human-browsable docs rendered from `/openapi.json`.
+
+Both endpoints are public (no `X-Internal-Secret` required). A coverage test
+(`backend/tests/test_openapi_coverage.py`) asserts every registered route is
+documented, so the spec never drifts from the code.
 
 ---
 ## System Stability & Environment Fixes
@@ -149,14 +167,33 @@ cd backend
 python api.py
 ```
 
-The Flask ML API binds to `127.0.0.1` (localhost only) with the debugger
-disabled by default. These are controlled via environment variables:
+#### Configuration
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `FLASK_PORT` | `5000` | Port the API listens on. |
-| `FLASK_HOST` | `127.0.0.1` | Interface to bind. Use `0.0.0.0` to expose on all interfaces **only behind a trusted proxy**. |
-| `FLASK_DEBUG` | `false` | Enables the Werkzeug debugger. Keep off outside local development — it allows remote code execution. |
+The Flask ML API validates its entire configuration once at startup
+(`backend/settings.py`). If anything is misconfigured it **fails fast at boot**
+and reports **every** problem at once in a single error, rather than surfacing
+them one restart at a time. The validated variables:
+
+| Variable | Default | Validation | Purpose |
+| --- | --- | --- | --- |
+| `INTERNAL_SECRET` | — (required) | Present and ≥ 32 characters | Shared secret authenticating requests from the Node/Express backend. No fallback. |
+| `FLASK_HOST` | `127.0.0.1` | — | Interface to bind. Use `0.0.0.0` to expose on all interfaces **only behind a trusted proxy**. |
+| `FLASK_PORT` | `5000` | Integer in `1`–`65535` | Port the API listens on. |
+| `FLASK_DEBUG` | `false` | Refused when `true` on a non-loopback `FLASK_HOST` | Enables the Werkzeug debugger. Keep off outside local development — it allows remote code execution. |
+| `MAX_MESSAGE_LENGTH` | `10000` | Non-negative integer | Maximum accepted `/predict` message length (characters). |
+| `SERVICE_IP_ALLOWLIST` | `127.0.0.1,::1` | — | Comma-separated IPs allowed to reach protected routes (skipped when `NODE_ENV=development`). |
+| `NODE_ENV` | unset | — | `development` relaxes IP allowlisting for local work. |
+| `MODEL_PATH` | `linear_svm_model.pkl` | File must exist and be non-empty | Spam classifier model. |
+| `VECTORIZER_PATH` | `tfidf_vectorizer.pkl` | File must exist and be non-empty | TF-IDF vectorizer for the classifier. |
+| `LABEL_ENCODER_PATH` | `label_encoder.pkl` | File must exist and be non-empty | Label encoder for the classifier. |
+| `URL_MODEL_PATH` | `url_detector.pkl` | File must exist and be non-empty | URL maliciousness model. |
+| `URL_VECTORIZER_PATH` | `url_vectorizer.pkl` | File must exist and be non-empty | Vectorizer for the URL model. |
+
+Relative model paths are resolved against `backend/`. Optional integrations
+(`REDIS_URL` / `RATE_LIMIT_STORAGE_URI` for rate-limit storage,
+`SAFE_BROWSING_API_KEY` / `VIRUSTOTAL_API_KEY` for threat intel) are also exposed
+on the settings object; they are unvalidated because each degrades gracefully
+when unset.
 
 > ⚠️ Never run with `FLASK_DEBUG=true` while bound to a non-loopback host. The
 > app refuses to start for that combination to prevent exposing the interactive
@@ -218,6 +255,11 @@ The Spam Detection System now returns human-readable explanation details with ev
     "overall_risk": "SAFE",
     "details": []
   },
+  "url_risk": {
+    "is_url_present": false,
+    "score": 0,
+    "level": "SAFE"
+  },
   "explanation": {
     "score": 94,
     "reasons": [
@@ -272,6 +314,37 @@ curl -X POST http://localhost:5000/predict \
 * `result` and `prediction` both return the same label.
 * `explanation` is optional in older API clients, but modern clients can use it to display detailed spam reasoning.
 
+## 🔗 URL / Phishing Risk Detection
+
+Every `/predict` call scans the input text for URLs (`domain_checker.py`) and reports the result two ways:
+
+* **`domain_analysis`** – the full breakdown: every domain found, each domain's individual risk report (`age_days`, `blacklisted`, `blacklist_details`, `threat_intel_details`, `risk_score`, `risk_level`, `recommendation`), and the overall `max_risk_score` / `overall_risk` across all domains in the message.
+* **`url_risk`** – a thin, top-level summary of `domain_analysis` for clients that just want a quick signal without parsing the full structure:
+
+  | Field | Description |
+  |---|---|
+  | `is_url_present` | `true` if any URL/domain was found in the text |
+  | `score` | Highest risk score (0-100) across all domains found |
+  | `level` | `SAFE`, `WARNING`, or `BLOCK` |
+
+Risk scoring combines several signals per domain:
+
+* **Domain age** – looked up via WHOIS (`python-whois`); newly registered domains score higher risk.
+* **DNSBL blacklists** – checked via `dnspython` against Spamhaus ZEN, SpamCop, Barracuda, and Spamhaus DBL.
+* **Threat intelligence** – always checks URLhaus (no key required); optionally checks Google Safe Browsing and VirusTotal if API keys are configured.
+* **Heuristics** (`api.py`) – IP-literal hosts, punycode hosts, `@` in the URL, excessive hyphens, and suspicious TLDs (`.tk`, `.ml`, `.ga`, `.cf`, `.gq`, `.xyz`, `.top`, `.work`, `.click`, `.loan`, `.men`, `.review`) feed into the dedicated URL classifier used when `type` is `"url"`.
+
+To enable the optional threat-intel providers, set these environment variables for the Flask API:
+
+```bash
+SAFE_BROWSING_API_KEY=your_google_safe_browsing_key   # optional
+VIRUSTOTAL_API_KEY=your_virustotal_key                 # optional
+```
+
+Without these keys, URLhaus and the WHOIS/DNSBL checks still run — the risk score just won't include Safe Browsing or VirusTotal verdicts.
+
+The frontend's URL preview (hover on a detected link) shows this same `url_risk` signal once a prediction has run, falling back to a lightweight local heuristic (known shortener domains, suspicious keywords) before the first prediction.
+
 ## Mongo Db Atlas Backend
 .env
 
@@ -322,6 +395,92 @@ When the limit is exceeded the API returns:
 
 `HTTP 429 Too Many Requests`
 
+### Flask ML API: per-endpoint limits
+
+The Python ML API applies dedicated limits to its expensive endpoints on top of a
+shared default. Counters are stored in-memory by default; set `REDIS_URL` (or
+`RATE_LIMIT_STORAGE_URI`) to enforce limits across multiple workers/instances,
+with automatic in-memory fallback if Redis is unreachable.
+
+| Endpoint(s) | Policy | Default | Override |
+| --- | --- | --- | --- |
+| `/predict` | prediction | 50/min | `PREDICT_RATE_LIMIT` |
+| `/bulk-predict`, `/bulk-predict/export` | batch inference | 10/min | `BULK_PREDICT_RATE_LIMIT` |
+| `/scan-emails` | threat intel | 20/min | `THREAT_INTEL_RATE_LIMIT` |
+| `/gmail/emails`, `/outlook/emails` | inbox fetch | 15/min | `EMAIL_FETCH_RATE_LIMIT` |
+| everything else | default | 50/min | `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` |
+
+Each limit accepts either the native `"<n> per <window>"` form or the Node-style
+`*_MAX` + `*_WINDOW_MS` pair. Exceeding a limit returns a JSON `429` with a
+`Retry-After` header, and each rejection is logged with the client, endpoint, and
+limit for operational visibility.
+
+## Error format
+
+Every error response from the Flask ML API uses one machine-readable envelope
+(issue #986). It is **backward compatible**: the legacy top-level `error` string
+is always present, and a structured `error_detail` block is added alongside it.
+
+```json
+{
+  "error": "No text provided",
+  "error_detail": {
+    "code": "NO_TEXT_PROVIDED",
+    "message": "No text provided",
+    "request_id": "req-abc123"
+  }
+}
+```
+
+* `error` — human-readable message; unchanged for existing clients.
+* `error_detail.code` — stable `ErrorCode` value (e.g. `NO_TEXT_PROVIDED`,
+  `INVALID_JSON_BODY`, `TEXT_TOO_LONG`, `INVALID_FEEDBACK`, `FORBIDDEN`,
+  `NOT_FOUND`, `RATE_LIMITED`, `PROVIDER_NOT_CONNECTED`, `UPSTREAM_FETCH_FAILED`,
+  `INTERNAL_ERROR`). Branch on this rather than parsing the message.
+* `error_detail.message` — same text as `error`.
+* `error_detail.request_id` — echoes `X-Request-ID` (`g.request_id`) so a failure
+  can be correlated with server logs.
+
+Success responses are unchanged. A few error responses carry extra top-level
+fields for backward compatibility: the zero-trust `403` and the word-cloud
+endpoints keep `success: false`, and the `429` keeps its `success` / `error` /
+`message` fields — all with `error_detail` added. Success responses are never
+modified. Codes are defined in `backend/errors.py`.
+
+---
+
+## 📊 Metrics & Monitoring
+
+The Flask ML API exposes a Prometheus-compatible `GET /metrics` endpoint (powered
+by `prometheus-client`). It is public — a scraper reaches it without the internal
+secret because it emits only aggregate counters, never message content — and
+returns the standard `text/plain; version=0.0.4` exposition format.
+
+Metrics collected (labels in parentheses):
+
+| Metric | Type | Labels |
+| --- | --- | --- |
+| `spam_predictions_total` | Counter | `result`, `input_type` |
+| `spam_request_latency_seconds` | Histogram | `endpoint`, `method` |
+| `spam_requests_total` | Counter | `endpoint`, `method`, `status` |
+| `spam_errors_total` | Counter | `endpoint` |
+| `spam_rate_limit_rejections_total` | Counter | `policy` |
+| `spam_model_loaded` | Gauge | — |
+
+Request counts, latency, errors, and rate-limit rejections are recorded from the
+existing request lifecycle; `spam_model_loaded` is set to `1` once the models load
+at startup.
+
+Sample Prometheus scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: spam-ml-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["localhost:5000"]
+```
+
 ---
 
 ## 💻 React Frontend
@@ -365,7 +524,11 @@ export default App;
 
 ## 📱 React Native App (Android & iOS)
 
-### 📦 Setup
+The actual mobile app lives in `spamdetection/` (Expo). See [`spamdetection/README.md`](spamdetection/README.md) for setup, and specifically its **Configuring the API URL** section for how to point the app at your backend — the API base URL is resolved from `EXPO_PUBLIC_ANDROIDAPI`/`EXPO_PUBLIC_IOSAPI` env vars (`spamdetection/.env.example`), not hardcoded, with working defaults for the Android emulator/iOS simulator and a console warning + LAN-IP instructions for real-device testing.
+
+### 📦 Setup (building your own client from scratch)
+
+If you're building a separate React Native client against this backend rather than using `spamdetection/`, the same principle applies: don't hardcode an IP, read it from an env var with a documented fallback.
 
 ```bash
 npx create-expo-app
@@ -379,12 +542,17 @@ import { useState } from "react";
 import { View, Text, TextInput, Button } from "react-native";
 import axios from "axios";
 
+// Prefer an env var (e.g. EXPO_PUBLIC_API_URL) over a hardcoded IP - see
+// spamdetection/constants/api.ts for a fuller example with platform
+// detection and a missing-config warning.
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+
 export default function App() {
   const [text, setText] = useState("");
   const [result, setResult] = useState("");
 
   const predict = async () => {
-    const res = await axios.post("http://YOUR_IP:3000/predict", { text });
+    const res = await axios.post(`${API_URL}/predict`, { text });
     setResult(res.data.result);
   };
 
@@ -497,11 +665,46 @@ python retrain.py
 
 This merges `feedback_store.csv` with the original training dataset (`DATASET_PATH`, default `dataset.csv`), retrains the TF-IDF vectorizer, LinearSVC model and label encoder, and overwrites `linear_svm_model.pkl`, `tfidf_vectorizer.pkl` and `label_encoder.pkl`.
 
+### Reviewing collected feedback
+
+`POST /feedback` was write-only until now — there was no way to see what had been collected without opening `feedback_store.csv` by hand. `GET /feedback/stats` (available on both the Node backend and the Flask ML API, same auth requirements as `POST /feedback`) aggregates it:
+
+```json
+{
+  "total": 5,
+  "corrections": 2,
+  "correction_rate": 0.4,
+  "by_predicted_label": {
+    "ham": {
+      "total": 3,
+      "corrections": 1,
+      "corrected_to": { "spam": 1 }
+    }
+  },
+  "recent": [
+    {
+      "text_preview": "Congratulations! You won a free prize, click here",
+      "predicted_label": "ham",
+      "correct_label": "spam",
+      "submitted_at": "2026-07-13T20:43:57.011074+00:00"
+    }
+  ]
+}
+```
+
+* `total` / `corrections` / `correction_rate` — overall counts and what fraction of feedback disagreed with the model.
+* `by_predicted_label` — per predicted label, how often it was confirmed vs. corrected, and what it was corrected to.
+* `recent` — the 20 most recent submissions, most recent first (`text_preview` is truncated to 100 characters).
+
+The web app's "Insights" tab shows this under **User Feedback**.
+
 ---
 ## .env.example (Frontend)
 VITE_GOOGLE_CLIENT_ID=your_google_client_id_here
 VITE_API_URI=http://localhost:3000
 VITE_PYTHON_URI=http://127.0.0.1:5000
+
+If either `VITE_API_URI` or `VITE_PYTHON_URI` is missing, the app falls back to the localhost defaults shown above (so local development still works with no `.env` at all) but logs a console warning explaining that a real deployment needs it set explicitly - see `frontend/src/utils/axiosInstance.js`.
 
 ---
 

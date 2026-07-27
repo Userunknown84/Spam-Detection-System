@@ -49,7 +49,7 @@ export default function EmailHeaderAnalyzer() {
         const formData = new FormData();
         formData.append("file", file);
         res = await api.post(
-          `${import.meta.env.VITE_API_URI || ""}/analyze-email-header`,
+          "/analyze-email-header",
           formData,
           {
             headers: {
@@ -59,7 +59,7 @@ export default function EmailHeaderAnalyzer() {
         );
       } else {
         res = await api.post(
-          `${import.meta.env.VITE_API_URI || ""}/analyze-email-header`,
+          "/analyze-email-header",
           { headers: headers }
         );
       }

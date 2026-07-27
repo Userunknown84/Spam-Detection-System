@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    name: Python (pytest + flake8)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    # INTERNAL_SECRET (mandatory config for api.py) is intentionally left
+    # unset here: tests/conftest.py provides a fixed test value via
+    # os.environ.setdefault, and several tests assert against that exact
+    # value in request headers, so overriding it here would break them.
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install flake8
+
+      - name: Lint (flake8)
+        run: flake8
+
+      - name: Run pytest
+        run: pytest tests/ -q
+
+  node-backend:
+    name: Node backend (npm test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (eslint)
+        # The backend has never been linted before and has pre-existing
+        # parsing/reference errors unrelated to any given PR; report without
+        # blocking merges until a dedicated cleanup PR lands.
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run tests
+        run: npm test
+
+  frontend:
+    name: Frontend (npm test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (eslint)
+        # Pre-existing errors unrelated to this workflow; see backend note
+        # above. Report without blocking until a dedicated cleanup PR lands.
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run tests
+        run: npm test

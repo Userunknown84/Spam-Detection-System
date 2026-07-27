@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { useTheme } from "../context/ThemeContext";
 import { MOBILE_THEMES } from "../constants/themes";
+import { PREDICT_URL } from "../constants/api";
 
 const LABEL_MAP: Record<
   string,
@@ -51,11 +52,6 @@ export default function Index() {
   const confidencePct =
     confidence !== null ? Math.min(confidence * 50 + 50, 100).toFixed(1) : "0.0";
 
-  const API_URL =
-    Platform.OS === "android"
-      ? (process.env.EXPO_PUBLIC_ANDROIDAPI ?? "http://10.0.2.2:3000/predict")
-      : (process.env.EXPO_PUBLIC_IOSAPI ?? "http://localhost:3000/predict");
-
   const handlePredict = async () => {
     if (!text) {
       setResult("Enter some text");
@@ -69,7 +65,7 @@ export default function Index() {
       setConfidence(null);
 
       // Node backend /predict takes { text, type }
-      const res = await axios.post(API_URL, {
+      const res = await axios.post(PREDICT_URL, {
         text: text,
         type: type,
       });

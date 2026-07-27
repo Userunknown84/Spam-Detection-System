@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import api from "../utils/axiosInstance";
 import "../App.css";
+import { Settings } from './Settings';
 import CensorshipMode from '../components/CensorshipMode';
 import FeatureImportance from "../components/FeatureImportance";
 import PredictionExplanation from "../components/PredictionExplanation";
@@ -29,14 +30,26 @@ import SpamPatternLibrary from '../components/SpamPatternLibrary';
 import URLPreview from '../components/URLPreview';
 import InstallAppButton from "../components/InstallAppButton";
 import RulesManager from "../components/RulesManager";
+import AdminRulesManager from "../components/AdminRulesManager";
+import AdminFeedbackView from "../components/AdminFeedbackView";
+
+// ============================================
+// CONSTANTS - Character Counter (Issue #947)
+// ============================================
+
+const MAX_CHAR_LIMIT = 5000;
+const WARNING_CHAR_LIMIT = 500;
+const CHARS_WARNING_LEVEL = 400; // 80% of 500
 
 function App() {
   const navigate = useNavigate();
   const [text, setText] = useState("");
   const [result, setResult] = useState("");
+  const [historyId, setHistoryId] = useState(null);
   const [confidence, setConfidence] = useState(null);
   const [severity, setSeverity] = useState(null);
   const [explanation, setExplanation] = useState(null);
+  const [urlRisk, setUrlRisk] = useState(null);
   const [loading, setLoading] = useState(false);
   const [type, setType] = useState("message");
   const [errorInfo, setErrorInfo] = useState(null);
@@ -359,7 +372,7 @@ const analyzeEmojiSentiment = (text) => {
     if (loading) return;
       try {
       setLoading(true);
-      const res = await api.post(`${import.meta.env.VITE_API_URI}/predict`, {
+      const res = await api.post('/predict', {
         text: text,
         type: type,
       });
@@ -369,9 +382,11 @@ const analyzeEmojiSentiment = (text) => {
         localStorage.setItem('firstPrediction', 'true');
       }
       setResult(res.data.prediction);
+      setHistoryId(res.data.historyId || null);
       setConfidence(res.data.confidence ?? null);
       setSeverity(res.data.severity || null);
       setExplanation(res.data.explanation || null);
+      setUrlRisk(res.data.url_risk || null);
       setErrorInfo(null);
     } catch (error) {
       console.error('API Error:', error);
@@ -413,6 +428,33 @@ const analyzeEmojiSentiment = (text) => {
   });
   } finally {
       setLoading(false);
+    }
+  };
+
+  // ============================================
+  // ✅ HANDLE CLEAR BUTTON (Issue #948)
+  // ============================================
+  const handleClear = () => {
+    // Clear text input
+    setText("");
+
+    // Clear all results
+    setResult("");
+    setHistoryId(null);
+    setConfidence(null);
+    setSeverity(null);
+    setExplanation(null);
+    setUrlRisk(null);
+    setErrorInfo(null);
+    setRateLimitError('');
+    setCopied(false);
+    setType("message");
+    setShowDeSpamify(false);
+
+    // Clear DeSpamify text if shown
+    if (document.querySelector('.de-spamify-result')) {
+      const deSpamifyText = document.querySelector('.de-spamify-result');
+      if (deSpamifyText) deSpamifyText.textContent = '';
     }
   };
 
@@ -468,6 +510,9 @@ const analyzeEmojiSentiment = (text) => {
   const severityTone = severity?.level === "Critical" ? "text-red-600 dark:text-red-400" : severity?.level === "High" ? "text-orange-600 dark:text-orange-400" : severity?.level === "Moderate" ? "text-yellow-700 dark:text-yellow-400" : "text-green-700 dark:text-green-400";
   const emojiAnalysis = useMemo(() => analyzeEmojiSentiment(text), [text]);
 
+  // Check if clear button should be shown
+  const showClearButton = text.length > 0 || result !== "" || errorInfo !== null || rateLimitError !== "";
+
   return (
     <div className={`min-h-screen flex flex-col items-center px-4 py-8 pb-32 transition-all duration-500 ${isDark ? activeTheme.dark : activeTheme.light}`}>
       {/* Top Controls */}
@@ -485,7 +530,6 @@ const analyzeEmojiSentiment = (text) => {
         >
           {isDark ? '☀️' : '🌙'}
         </button>
-        <InstallAppButton />
         <button
           onClick={() => setShowSettings(!showSettings)}
           className={`px-4 py-2.5 rounded-xl font-bold transition-all active:scale-95 flex items-center gap-2 shadow-md ${isDark ? "bg-slate-800 text-white hover:bg-slate-700" : "bg-white/35 text-slate-850 hover:bg-white/50"}`}
@@ -530,7 +574,7 @@ const analyzeEmojiSentiment = (text) => {
             formData.append('avatar', file);
             try {
               const token = localStorage.getItem('token');
-              const res = await api.post(`${import.meta.env.VITE_API_URI || ''}/api/v1/auth/avatar`, formData, {
+              const res = await api.post('/api/v1/auth/avatar', formData, {
                 headers: {
                   'Content-Type': 'multipart/form-data',
                   Authorization: `Bearer ${token}`
@@ -663,6 +707,22 @@ const analyzeEmojiSentiment = (text) => {
               </button>
                 Rules Manager
               </button>
+              {user?.role === 'admin' && (
+                <>
+                  <button
+                    onClick={() => setActiveTab("admin-rules")}
+                    className={`pb-1 px-4 transition-all border-b-2 ${activeTab === "admin-rules" ? "border-current opacity-100 text-purple-500" : "border-transparent opacity-50 hover:opacity-75"}`}
+                  >
+                    Admin Rules
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("admin-feedback")}
+                    className={`pb-1 px-4 transition-all border-b-2 ${activeTab === "admin-feedback" ? "border-current opacity-100 text-purple-500" : "border-transparent opacity-50 hover:opacity-75"}`}
+                  >
+                    Admin Feedback
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => setActiveTab("history")}
                 className={`pb-1 px-4 transition-all border-b-2 ${activeTab === "history" ? "border-current opacity-100" : "border-transparent opacity-50 hover:opacity-75"}`}
@@ -696,6 +756,7 @@ const analyzeEmojiSentiment = (text) => {
                   <textarea
                     className={`w-full border p-4 pr-12 rounded-2xl focus:outline-none focus:ring-2 resize-none text-sm sm:text-base transition-all shadow-inner leading-relaxed [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full ${isDark ? `${activeTheme.inputDark} focus:border-blue-500/50 [&::-webkit-scrollbar-thumb]:bg-slate-700 hover:[&::-webkit-scrollbar-thumb]:bg-slate-600` : `${activeTheme.input} focus:border-indigo-500/50 [&::-webkit-scrollbar-thumb]:bg-slate-300 hover:[&::-webkit-scrollbar-thumb]:bg-slate-400`}`}
                     rows="5"
+                    maxLength={MAX_CHAR_LIMIT}
                     placeholder={type === "url" ? "Paste or type the suspicious website link URL here to test..." : type === "message" ? "Type your SMS or chat message content here for inspection..." : "Paste the full text or body of your email content here..."}
                     value={text}
                     onChange={(e) => {
@@ -705,47 +766,71 @@ const analyzeEmojiSentiment = (text) => {
                       setType(detected);
                     }}
                     onKeyDown={(e) => {
-                      // Support Ctrl+Enter (Windows/Linux) and Cmd+Enter (macOS) to submit prediction
-                      if (
-                        (e.ctrlKey || e.metaKey) &&
-                        e.key === "Enter" &&
-                        !loading &&
-                        text.trim().length > 0 &&
-                        text.length <= 5000
-                      ) {
-                        e.preventDefault(); // Prevent default newline insertion
-                        handlePredict();
+                      // ✅ Plain Enter key support (Issue #946)
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!loading && text.trim().length > 0 && text.length <= MAX_CHAR_LIMIT) {
+                          handlePredict();
+                        }
+                      }
+                      // Support Ctrl+Enter (Windows/Linux) and Cmd+Enter (macOS)
+                      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                        e.preventDefault();
+                        if (!loading && text.trim().length > 0 && text.length <= MAX_CHAR_LIMIT) {
+                          handlePredict();
+                        }
                       }
                     }}
                   />
 
-                  {text && (
+                  {/* ✅ CLEAR BUTTON (Issue #948) */}
+                  {showClearButton && (
                     <button
-                      onClick={() => setText("")}
-                      className={`absolute top-3.5 right-3.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110 shadow-sm ${isDark ? "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white" : "bg-slate-200 text-slate-500 hover:bg-slate-300 hover:text-slate-800"}`}
-                      title="Clear input"
+                      onClick={handleClear}
+                      className={`absolute top-3.5 right-3.5 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold transition-all hover:scale-110 shadow-sm z-10 ${
+                        isDark 
+                          ? 'bg-red-900/40 text-red-400 hover:bg-red-800/60 hover:text-red-300 border border-red-700/30' 
+                          : 'bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 border border-red-200'
+                      }`}
+                      title="Clear all (text, results, errors)"
                     >
                       ✕
                     </button>
                   )}
+
+                  {/* Keyboard Shortcut Hint */}
+                  {text && (
+                    <div className="absolute bottom-2 right-14 text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
+                      <kbd className="px-1 py-0.5 rounded bg-white dark:bg-slate-900 text-[9px] font-mono border border-slate-300 dark:border-slate-600">Enter</kbd>
+                      <span>or</span>
+                      <kbd className="px-1 py-0.5 rounded bg-white dark:bg-slate-900 text-[9px] font-mono border border-slate-300 dark:border-slate-600">⌘+Enter</kbd>
+                      <span>to submit</span>
+                    </div>
+                  )}
+
+                  {/* ============================================
+                      ✅ ENHANCED CHARACTER COUNTER (Issue #947)
+                      ============================================ */}
                   {text && (
                     <div className="flex flex-wrap justify-between items-center mt-1.5 px-1 text-xs font-medium tracking-wide opacity-70 gap-1">
                       <div className="flex flex-wrap gap-3">
-                       <span>📖 {calculateReadingTime(text)}</span>
-                      <span>📝 {getTextStats(text).words} words</span>
-                      <span>📏 Avg {getTextStats(text).avgWordLength} chars</span>
-                      <span>📄 {getTextStats(text).sentences} sentences</span>
+                        <span>📖 {calculateReadingTime(text)}</span>
+                        <span>📝 {getTextStats(text).words} words</span>
+                        <span>📏 Avg {getTextStats(text).avgWordLength} chars</span>
+                        <span>📄 {getTextStats(text).sentences} sentences</span>
+                      </div>
+                      {text.length > MAX_CHAR_LIMIT ? (
+                        <span className="text-red-500 font-bold animate-pulse">
+                          {text.length.toLocaleString()} / {MAX_CHAR_LIMIT.toLocaleString()} characters ⚠️
+                        </span>
+                      ) : (
+                        <span className={text.length > WARNING_CHAR_LIMIT ? "text-orange-500 font-semibold" : "text-slate-400 dark:text-slate-500"}>
+                          {text.length.toLocaleString()} / {MAX_CHAR_LIMIT.toLocaleString()} characters
+                          {text.length > WARNING_CHAR_LIMIT && ` (${MAX_CHAR_LIMIT - text.length} remaining)`}
+                        </span>
+                      )}
                     </div>
-                    {text.length > 5000 ? (
-                      <span className="text-red-500 font-bold">
-                        {Math.max(0, text.length).toLocaleString()} / 5000 characters (Limit exceeded)
-                      </span>
-                    ) : (
-                      <span className={text.length > 500 ? "text-orange-500" : ""}>
-                        {Math.max(0, text.length).toLocaleString()} characters
-                      </span>
-                    )}
-                  </div>)}
+                  )}
 
                 </div>
 
@@ -754,7 +839,7 @@ const analyzeEmojiSentiment = (text) => {
                     if (!text.trim()) return;
                     handlePredict();
                   }}
-                  disabled={loading || text.trim().length === 0 || text.length > 5000}
+                  disabled={loading || text.trim().length === 0 || text.length > MAX_CHAR_LIMIT}
                   className={`mt-2 w-full py-3.5 rounded-xl font-bold text-white shadow-md active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${activeTheme.accent}`}
                 >
                   {loading && (
@@ -833,7 +918,7 @@ const analyzeEmojiSentiment = (text) => {
                       </span>
                     </div>
                      
-                    <URLPreview url={text} darkMode={isDark}>
+                    <URLPreview url={text} darkMode={isDark} urlRisk={urlRisk}>
                       <span className="text-blue-500 underline cursor-pointer">
                        {text}
                       </span>
@@ -1003,15 +1088,17 @@ const analyzeEmojiSentiment = (text) => {
                     )}
 
                     {result && result !== "Error" && type !== "url" && (
-                      <FeedbackWidget key={`${text}|${result}|${confidence}`} text={text} predictedLabel={result} darkMode={isDark} />
+                      <FeedbackWidget key={`${text}|${result}|${confidence}`} text={text} predictedLabel={result} darkMode={isDark} historyId={historyId} />
                     )}
 
                     <button
                       onClick={() => {
                       setText("");
                       setResult("");
+                      setHistoryId(null);
                       setConfidence(null);
                       setExplanation(null);
+                      setUrlRisk(null);
                       setErrorInfo(null);
                       setCopied(false);
                       setType("message");
@@ -1038,57 +1125,121 @@ const analyzeEmojiSentiment = (text) => {
                 <FeatureImportance darkMode={isDark} />
                 <CensorshipMode text={text} darkMode={isDark} />
 
-                  {wordOfDay && (
-  <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-slate-800/30 border-slate-700' : 'bg-white/40 border-slate-200'}`}>
-    <div className="flex items-center justify-between mb-2">
-      <h3 className="text-sm font-semibold opacity-70">📚 Spam Word of the Day</h3>
-      <button onClick={fetchWordOfTheDay} className="text-xs opacity-50 hover:opacity-100 transition-opacity" title="Refresh word of the day">
-        
-      </button>
-    </div>
-    {wordLoading ? (
-      <div className="h-8 w-48 bg-slate-300 rounded animate-pulse"></div>
-    ) : (
-      <>
-        <div className="flex items-center gap-3">
-          <span className={`text-2xl font-bold ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
-            {wordOfDay.word || 'No spam detected today'}
-          </span>
-          {wordOfDay.count && (
-            <span className="text-sm opacity-60">
-              {wordOfDay.count} {wordOfDay.count === 1 ? 'detection' : 'detections'}
-            </span>
-          )}
-        </div>
-        {wordOfDay.definition && (
-          <p className="text-sm mt-2 opacity-75 leading-relaxed">{wordOfDay.definition}</p>
-        )}
-        {wordOfDay.context && (
-          <div className={`mt-2 p-2 rounded text-xs ${isDark ? 'bg-slate-900/50' : 'bg-slate-100/50'}`}>
-            <span className="opacity-60">Example: </span>
-            <span className="italic">"{wordOfDay.context}"</span>
-          </div>
-        )}
-        {wordOfDay.tips && (
-          <div className={`mt-2 p-2 rounded text-xs ${isDark ? 'bg-blue-900/20' : 'bg-blue-50'}`}>
-             {wordOfDay.tips}
-          </div>
-        )}
-      </>
-    )}
-  </div>
-)}
+                {/* SPAM WORD OF THE DAY */}
+                {wordOfDay && (
+                  <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-slate-800/30 border-slate-700' : 'bg-white/40 border-slate-200'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold opacity-70">📚 Spam Word of the Day</h3>
+                      <button onClick={fetchWordOfTheDay} className="text-xs opacity-50 hover:opacity-100 transition-opacity" title="Refresh word of the day">
+                        🔄
+                      </button>
+                    </div>
+                    {wordLoading ? (
+                      <div className="h-8 w-48 bg-slate-300 rounded animate-pulse"></div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-2xl font-bold ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                            {wordOfDay.word || 'No spam detected today'}
+                          </span>
+                          {wordOfDay.count && (
+                            <span className="text-sm opacity-60">
+                              {wordOfDay.count} {wordOfDay.count === 1 ? 'detection' : 'detections'}
+                            </span>
+                          )}
+                        </div>
+                        {wordOfDay.definition && (
+                          <p className="text-sm mt-2 opacity-75 leading-relaxed">{wordOfDay.definition}</p>
+                        )}
+                        {wordOfDay.context && (
+                          <div className={`mt-2 p-2 rounded text-xs ${isDark ? 'bg-slate-900/50' : 'bg-slate-100/50'}`}>
+                            <span className="opacity-60">Example: </span>
+                            <span className="italic">"{wordOfDay.context}"</span>
+                          </div>
+                        )}
+                        {wordOfDay.tips && (
+                          <div className={`mt-2 p-2 rounded text-xs ${isDark ? 'bg-blue-900/20' : 'bg-blue-50'}`}>
+                            💡 {wordOfDay.tips}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
 
-              <FeatureImportance darkMode={isDark} />
-            </>
-          ) : activeTab === "bulk" ? (
+                <div className="mt-6 p-4 rounded-xl border text-left">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold opacity-70">📈 Spam Detection Insights</span>
+                    <div className="flex items-center gap-2">
+                      {getEarnedBadges().map((badge) => (
+                        <span key={badge.day} className="text-lg" title={badge.name}>
+                          {badge.icon}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <Route path="/settings" element={<Settings />} />
+
+                <WordCloud darkMode={isDark} />
+              </>
+            ) : activeTab === "bulk" ? (
             <BulkSpamDetection />
           ) : activeTab === "insights" ? (
             <SpamInsightsDashboard />
           ) : activeTab === "scanner" ? (
             <EmailScannerDashboard />
+          ) : activeTab === "rules" ? (
+            <RulesManager />
+          ) : activeTab === "admin-rules" ? (
+            <AdminRulesManager />
+          ) : activeTab === "admin-feedback" ? (
+            <AdminFeedbackView />
+          ) : activeTab === "history" ? (
+            <History />
           ) : (
             <EmailHeaderAnalyzer />
+          )}
+
+          {showCelebration && (
+            <div className="celebration-modal" style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{
+                background: 'white',
+                padding: '40px',
+                borderRadius: '20px',
+                textAlign: 'center',
+                maxWidth: '400px',
+                width: '90%'
+              }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
+                <h2 style={{ color: '#7c3aed' }}>First Prediction Complete!</h2>
+                <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+                  You're on your way to becoming a spam detection expert!
+                </p>
+                <button
+                  onClick={() => setShowCelebration(false)}
+                  style={{
+                    padding: '10px 30px',
+                    background: '#7c3aed',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Continue Learning →
+                </button>
+              </div>
+            </div>
           )}
           <WordCloud darkMode={isDark} />
         </div>
