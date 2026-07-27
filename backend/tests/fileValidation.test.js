@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const express = require('express');
 const multer = require('multer');
-const { validateCSVUpload, sanitizeCSVCell, parseCSVLine } = require('../middleware/fileValidation');
+const { validateCSVUpload, sanitizeCSVCell, parseCSVLine } = require('../middleware/filevalidation');
 
 // ============================================
 // TEST HELPERS
