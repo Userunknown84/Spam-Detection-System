@@ -3,6 +3,7 @@
  */
 
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 
 // Configuration
 const MAX_REQUEST_SIZE = parseInt(process.env.MAX_REQUEST_SIZE) || 10 * 1024 * 1024; // 10MB
@@ -144,7 +145,7 @@ const trainingRateLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => {
-        return req.user?.id || req.ip || req.connection.remoteAddress;
+        return req.user?.id || ipKeyGenerator(req.ip || req.connection.remoteAddress);
     }
 });
 
