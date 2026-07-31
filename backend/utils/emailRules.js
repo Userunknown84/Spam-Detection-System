@@ -71,7 +71,7 @@ async function applyRulesToEmails(userId, emails) {
       return {
         ...email,
         prediction: updatedPrediction,
-        rule_applied: matchingRule.type
+        rule_applied: matchedType
       };
     }
 

@@ -74,7 +74,7 @@ function sanitizeCSVCell(value) {
     let sanitized = value.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     
     // Neutralize formula injection
-    if (/^[=\+\-@]/.test(sanitized)) {
+    if (/^[=+\-@]/.test(sanitized)) {
         sanitized = "'" + sanitized;
     }
     

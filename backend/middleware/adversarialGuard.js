@@ -61,12 +61,9 @@ function detectAdversarialPatterns(text) {
         }
     }
 
-    const normalizedScore = Math.min(score, 1.0);
-    
-
     // Normalize score
     const normalizedScore = Math.min(score, 1.0);
-    
+
     // Check for extremely long text (potential DoS)
 
     if (text.length > 10000) {
@@ -86,9 +83,6 @@ function detectAdversarialPatterns(text) {
     };
 }
 
-function adversarialGuard(req, res, next) {
-    const text = req.body?.text || req.query?.text || '';
-    
 /**
  * Middleware to check for adversarial patterns
  */
@@ -101,10 +95,6 @@ function adversarialGuard(req, res, next) {
         req.adversarialAnalysis = { isSuspicious: false, score: 0, patterns: [] };
         return next();
     }
-
-    const analysis = detectAdversarialPatterns(text);
-    req.adversarialAnalysis = analysis;
-
 
     // Check for adversarial patterns
     const analysis = detectAdversarialPatterns(text);
@@ -145,14 +135,10 @@ function monitorConfidence(req, res, next) {
                 responseData = data;
             }
 
-            if (responseData && typeof responseData === 'object') {
-                const confidence = responseData.confidence_score || responseData.confidence || 0;
-                
-
             // Check if it's a prediction response
             if (responseData && typeof responseData === 'object') {
                 const confidence = responseData.confidence_score || responseData.confidence || 0;
-                
+
                 // Add adversarial analysis
 
                 if (req.adversarialAnalysis) {
@@ -173,11 +159,6 @@ function monitorConfidence(req, res, next) {
                     console.log(`⚠️ [CONFIDENCE MONITOR] Low confidence prediction:`, {
                         confidence,
                         threshold: CONFIDENCE_THRESHOLD,
-                        prediction: responseData.result || responseData.prediction
-                    });
-                }
-
-
                         prediction: responseData.result || responseData.prediction,
                         textPreview: req.body?.text?.substring(0, 100)
                     });
@@ -195,7 +176,6 @@ function monitorConfidence(req, res, next) {
                 originalSend.call(this, jsonData);
                 return;
             }
-        } catch (e) {}
         } catch (e) {
             // If parsing fails, just pass through
         }

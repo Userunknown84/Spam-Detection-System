@@ -17,7 +17,10 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x]
+        # 18.x is EOL and no longer satisfies the eslint 10.x devDependency's
+        # engines requirement (^20.19.0 || ^22.13.0 || >=24) introduced by
+        # this PR; test against the versions we actually support instead.
+        node-version: [20.x, 22.x, 24.x]
 
     defaults:
       run:

@@ -5,13 +5,13 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import api from "../utils/axiosInstance";
 import "../App.css";
-import { Settings } from './pages/Settings';
+import { Settings } from './Settings';
 import CensorshipMode from '../components/CensorshipMode';
 import FeatureImportance from "../components/FeatureImportance";
 import PredictionExplanation from "../components/PredictionExplanation";
 import History from "../components/History";
 import WordCloud from "../components/WordCloud";
-import ManipulationIndex from './ManipulationIndex';
+import ManipulationIndex from '../components/ManipulationIndex';
 import FeedbackWidget from "../components/FeedbackWidget";
 import Login from "./Login.jsx";
 import DeSpamify from '../components/DeSpamify';
@@ -455,7 +455,7 @@ const analyzeEmojiSentiment = (text) => {
   const handleClear = () => {
     // Clear text input
     setText("");
-    
+
     // Clear all results
     setResult("");
     setHistoryId(null);
@@ -468,23 +468,11 @@ const analyzeEmojiSentiment = (text) => {
     setCopied(false);
     setType("message");
     setShowDeSpamify(false);
-    
+
     // Clear DeSpamify text if shown
     if (document.querySelector('.de-spamify-result')) {
       const deSpamifyText = document.querySelector('.de-spamify-result');
       if (deSpamifyText) deSpamifyText.textContent = '';
-    }
-  };
-
-  // ============================================
-  // ✅ HANDLE ENTER KEY (Issue #946)
-  // ============================================
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (!loading && text.trim().length > 0 && text.length <= MAX_CHAR_LIMIT) {
-        handlePredict();
-      }
     }
   };
 
@@ -1267,68 +1255,6 @@ const analyzeEmojiSentiment = (text) => {
                 <WordCloud darkMode={isDark} />
               </>
             ) : activeTab === "bulk" ? (
-              <BulkSpamDetection />
-            ) : activeTab === "insights" ? (
-              <SpamInsightsDashboard />
-            ) : activeTab === "scanner" ? (
-              <EmailScannerDashboard />
-            ) : activeTab === "rules" ? (
-              <RulesManager />
-            ) : activeTab === "history" ? (
-              <History />
-            ) : (
-              <EmailHeaderAnalyzer />
-            )}
-
-            {showCelebration && (
-              <div className="celebration-modal" style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.6)',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                zIndex: 1000
-              }}>
-                <div style={{
-                  background: 'white',
-                  padding: '40px',
-                  borderRadius: '20px',
-                  textAlign: 'center',
-                  maxWidth: '400px',
-                  width: '90%'
-                }}>
-                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
-                  <h2 style={{ color: '#7c3aed' }}>First Prediction Complete!</h2>
-                  <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-                    You're on your way to becoming a spam detection expert!
-                  </p>
-                  <button
-                    onClick={() => setShowCelebration(false)}
-                    style={{
-                      padding: '10px 30px',
-                      background: '#7c3aed',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Continue Learning →
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </>
-    )}
-  </div>
-)}
-
-              <FeatureImportance darkMode={isDark} />
-            </>
-          ) : activeTab === "bulk" ? (
             <BulkSpamDetection />
           ) : activeTab === "insights" ? (
             <SpamInsightsDashboard />
@@ -1344,6 +1270,46 @@ const analyzeEmojiSentiment = (text) => {
             <History />
           ) : (
             <EmailHeaderAnalyzer />
+          )}
+
+          {showCelebration && (
+            <div className="celebration-modal" style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{
+                background: 'white',
+                padding: '40px',
+                borderRadius: '20px',
+                textAlign: 'center',
+                maxWidth: '400px',
+                width: '90%'
+              }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎉</div>
+                <h2 style={{ color: '#7c3aed' }}>First Prediction Complete!</h2>
+                <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+                  You're on your way to becoming a spam detection expert!
+                </p>
+                <button
+                  onClick={() => setShowCelebration(false)}
+                  style={{
+                    padding: '10px 30px',
+                    background: '#7c3aed',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Continue Learning →
+                </button>
+              </div>
+            </div>
           )}
           <WordCloud darkMode={isDark} />
         </div>

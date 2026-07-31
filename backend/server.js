@@ -74,6 +74,8 @@ app.use('/predict', apiLimiter);
 app.use('/api', feedbackRoutes);
 app.use('/api/federation', federationRoutes);
 
+app.use('/api/evomail', evoMailRoutes);
+
 // Trust the first proxy so express-rate-limit correctly identifies user IPs
 
 
@@ -158,6 +160,7 @@ const monitorConnectionPool = () => {
         }
       }
     } catch (err) {
+      logger.error('[DB Pool] Failed to log connection pool stats:', err);
     }
   }, 60000); // every 60 seconds
 
