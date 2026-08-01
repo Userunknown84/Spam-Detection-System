@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
-const Feedback = require('../models/Feedback');
+const { protect } = require('../middleware/authMiddleware');
+const Feedback = require('../models/UserFeedback');
 
 
 router.post('/feedback', protect, async (req, res) => {
